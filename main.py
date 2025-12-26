@@ -201,6 +201,10 @@ async def lifespan(app: FastAPI):
     """
     logger.info("Starting application... Creating state managers.")
 
+    # 确保 debug_logs 目录存在
+    debug_dir = Path(settings.debug_dir)
+    debug_dir.mkdir(parents=True, exist_ok=True)
+
     # 检查是否配置了全局凭证
     has_global_credentials = bool(settings.refresh_token) or bool(settings.kiro_creds_file)
 

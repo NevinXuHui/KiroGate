@@ -24,6 +24,7 @@ Contains generators for:
 - Converting AWS SSE to OpenAI SSE
 - Forming streaming chunks
 - Processing tool calls in stream
+- Adaptive timeout handling for slow models
 """
 
 import asyncio
@@ -37,7 +38,7 @@ from loguru import logger
 
 from kiro_gateway.parsers import AwsEventStreamParser, parse_bracket_tool_calls, deduplicate_tool_calls
 from kiro_gateway.utils import generate_completion_id
-from kiro_gateway.config import settings
+from kiro_gateway.config import settings, get_adaptive_timeout
 from kiro_gateway.tokenizer import count_tokens, count_message_tokens, count_tools_tokens
 
 if TYPE_CHECKING:
@@ -245,18 +246,22 @@ async def stream_kiro_to_openai_internal(
     context_usage_percentage = None
     content_parts: list[str] = []  # 使用 list 替代字符串拼接，提升性能
 
+    # 根据模型自适应调整超时时间
+    adaptive_first_token_timeout = get_adaptive_timeout(model, first_token_timeout)
+    adaptive_stream_read_timeout = get_adaptive_timeout(model, stream_read_timeout)
+
     try:
         byte_iterator = response.aiter_bytes()
 
-        # Wait for first chunk with timeout
+        # Wait for first chunk with adaptive timeout
         try:
             first_byte_chunk = await asyncio.wait_for(
                 byte_iterator.__anext__(),
-                timeout=first_token_timeout
+                timeout=adaptive_first_token_timeout
             )
         except asyncio.TimeoutError:
-            logger.warning(f"First token timeout after {first_token_timeout}s")
-            raise FirstTokenTimeoutError(f"No response within {first_token_timeout} seconds")
+            logger.warning(f"First token timeout after {adaptive_first_token_timeout}s (model: {model})")
+            raise FirstTokenTimeoutError(f"No response within {adaptive_first_token_timeout} seconds")
         except StopAsyncIteration:
             logger.debug("Empty response from Kiro API")
             yield "data: [DONE]\n\n"
@@ -298,15 +303,29 @@ async def stream_kiro_to_openai_internal(
             elif event["type"] == "context_usage":
                 context_usage_percentage = event["data"]
 
-        # Continue reading remaining chunks with timeout
+        # Continue reading remaining chunks with adaptive timeout
+        # 对于慢模型和大文档，可能需要更长时间等待每个 chunk
+        consecutive_timeouts = 0
+        max_consecutive_timeouts = 3  # 允许连续超时次数
         while True:
             try:
-                chunk = await _read_chunk_with_timeout(byte_iterator, stream_read_timeout)
+                chunk = await _read_chunk_with_timeout(byte_iterator, adaptive_stream_read_timeout)
+                consecutive_timeouts = 0  # 重置超时计数器
             except StopAsyncIteration:
                 break
             except StreamReadTimeoutError as e:
-                logger.error(f"Stream read timeout: {e}")
-                raise
+                consecutive_timeouts += 1
+                if consecutive_timeouts <= max_consecutive_timeouts:
+                    logger.warning(
+                        f"Stream read timeout {consecutive_timeouts}/{max_consecutive_timeouts} "
+                        f"after {adaptive_stream_read_timeout}s (model: {model}). "
+                        f"Model may be processing large content - continuing to wait..."
+                    )
+                    # 继续等待下一个 chunk
+                    continue
+                else:
+                    logger.error(f"Stream read timeout after {max_consecutive_timeouts} consecutive timeouts (model: {model}): {e}")
+                    raise
 
             if debug_logger:
                 debug_logger.log_raw_chunk(chunk)
@@ -736,6 +755,9 @@ async def stream_kiro_to_anthropic(
     text_block_started = False
     tool_blocks_started = {}  # tool_id -> index
 
+    # 根据模型自适应调整超时时间
+    adaptive_stream_read_timeout = get_adaptive_timeout(model, stream_read_timeout)
+
     try:
         # Отправляем message_start
         message_start = {
@@ -753,16 +775,29 @@ async def stream_kiro_to_anthropic(
         }
         yield f"event: message_start\ndata: {json.dumps(message_start, ensure_ascii=False)}\n\n"
 
-        # Read chunks with timeout
+        # Read chunks with adaptive timeout
+        # 对于慢模型和大文档，可能需要更长时间等待每个 chunk
         byte_iterator = response.aiter_bytes()
+        consecutive_timeouts = 0
+        max_consecutive_timeouts = 3  # 允许连续超时次数
         while True:
             try:
-                chunk = await _read_chunk_with_timeout(byte_iterator, stream_read_timeout)
+                chunk = await _read_chunk_with_timeout(byte_iterator, adaptive_stream_read_timeout)
+                consecutive_timeouts = 0  # 重置超时计数器
             except StopAsyncIteration:
                 break
             except StreamReadTimeoutError as e:
-                logger.error(f"Anthropic stream read timeout: {e}")
-                raise
+                consecutive_timeouts += 1
+                if consecutive_timeouts <= max_consecutive_timeouts:
+                    logger.warning(
+                        f"Anthropic stream timeout {consecutive_timeouts}/{max_consecutive_timeouts} "
+                        f"after {adaptive_stream_read_timeout}s (model: {model}). "
+                        f"Model may be processing large content - continuing to wait..."
+                    )
+                    continue
+                else:
+                    logger.error(f"Anthropic stream read timeout after {max_consecutive_timeouts} consecutive timeouts (model: {model}): {e}")
+                    raise
 
             if debug_logger:
                 debug_logger.log_raw_chunk(chunk)
@@ -945,17 +980,33 @@ async def collect_anthropic_response(
     context_usage_percentage = None
     content_parts: list[str] = []  # 使用 list 替代字符串拼接，提升性能
 
+    # 根据模型自适应调整超时时间
+    adaptive_stream_read_timeout = get_adaptive_timeout(model, stream_read_timeout)
+
     try:
-        # Read chunks with timeout
+        # Read chunks with adaptive timeout
+        # 对于慢模型和大文档，可能需要更长时间等待每个 chunk
         byte_iterator = response.aiter_bytes()
+        consecutive_timeouts = 0
+        max_consecutive_timeouts = 3  # 允许连续超时次数
         while True:
             try:
-                chunk = await _read_chunk_with_timeout(byte_iterator, stream_read_timeout)
+                chunk = await _read_chunk_with_timeout(byte_iterator, adaptive_stream_read_timeout)
+                consecutive_timeouts = 0  # 重置超时计数器
             except StopAsyncIteration:
                 break
             except StreamReadTimeoutError as e:
-                logger.error(f"Anthropic collect stream read timeout: {e}")
-                raise
+                consecutive_timeouts += 1
+                if consecutive_timeouts <= max_consecutive_timeouts:
+                    logger.warning(
+                        f"Anthropic collect timeout {consecutive_timeouts}/{max_consecutive_timeouts} "
+                        f"after {adaptive_stream_read_timeout}s (model: {model}). "
+                        f"Model may be processing large content - continuing to wait..."
+                    )
+                    continue
+                else:
+                    logger.error(f"Anthropic collect stream read timeout after {max_consecutive_timeouts} consecutive timeouts (model: {model}): {e}")
+                    raise
 
             if debug_logger:
                 debug_logger.log_raw_chunk(chunk)

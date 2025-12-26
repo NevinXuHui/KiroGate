@@ -21,6 +21,7 @@
 HTTP 客户端管理器。
 
 全局 HTTP 客户端连接池管理，提高性能。
+支持自适应超时，针对慢模型（如 Opus）自动调整。
 """
 
 import asyncio
@@ -31,7 +32,7 @@ from fastapi import HTTPException
 from loguru import logger
 
 from kiro_gateway.auth import KiroAuthManager
-from kiro_gateway.config import settings
+from kiro_gateway.config import settings, get_adaptive_timeout
 from kiro_gateway.utils import get_kiro_headers
 
 
@@ -132,7 +133,8 @@ class KiroHttpClient:
         url: str,
         json_data: dict,
         stream: bool = False,
-        first_token_timeout: float = None
+        first_token_timeout: float = None,
+        model: str = None
     ) -> httpx.Response:
         """
         Execute HTTP request with retry logic.
@@ -149,6 +151,7 @@ class KiroHttpClient:
             json_data: JSON request body
             stream: Whether to use streaming response
             first_token_timeout: First token timeout (streaming only)
+            model: Model name (for adaptive timeout)
 
         Returns:
             HTTP response
@@ -156,13 +159,19 @@ class KiroHttpClient:
         Raises:
             HTTPException: After retry failure
         """
+        # 从 json_data 中提取模型名称（如果未提供）
+        if model is None:
+            model = json_data.get("modelId", "") if json_data else ""
+
         if stream:
             # 流式请求：使用较长的连接超时，实际读取超时在 streaming.py 中控制
-            timeout = first_token_timeout or settings.first_token_timeout
+            base_timeout = first_token_timeout or settings.first_token_timeout
+            timeout = get_adaptive_timeout(model, base_timeout)
             max_retries = settings.first_token_max_retries
         else:
             # 非流式请求：使用配置的超时时间（默认 600 秒）
-            timeout = settings.non_stream_timeout
+            base_timeout = settings.non_stream_timeout
+            timeout = get_adaptive_timeout(model, base_timeout)
             max_retries = settings.max_retries
 
         client = await self._get_client()
@@ -215,10 +224,10 @@ class KiroHttpClient:
             except httpx.TimeoutException as e:
                 last_error = e
                 if stream:
-                    logger.warning(f"First token timeout after {timeout}s (attempt {attempt + 1}/{max_retries})")
+                    logger.warning(f"First token timeout after {timeout}s for model {model} (attempt {attempt + 1}/{max_retries})")
                 else:
                     delay = settings.base_retry_delay * (2 ** attempt)
-                    logger.warning(f"Timeout, waiting {delay}s (attempt {attempt + 1}/{max_retries})")
+                    logger.warning(f"Timeout after {timeout}s for model {model}, waiting {delay}s (attempt {attempt + 1}/{max_retries})")
                     await asyncio.sleep(delay)
 
             except httpx.RequestError as e:

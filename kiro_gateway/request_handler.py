@@ -47,8 +47,16 @@ from kiro_gateway.streaming import (
     collect_anthropic_response,
 )
 from kiro_gateway.utils import generate_conversation_id, get_kiro_headers
-from kiro_gateway.config import settings
+from kiro_gateway.config import settings, AUTO_CHUNKING_ENABLED
 from kiro_gateway.metrics import metrics
+
+
+# 导入可选的自动分片处理器
+try:
+    from kiro_gateway.auto_chunked_handler import process_with_auto_chunking
+    auto_chunking_available = True
+except ImportError:
+    auto_chunking_available = False
 
 
 # 导入 debug_logger
@@ -285,6 +293,39 @@ class RequestHandler:
                         debug_logger.discard_buffers()
 
         return StreamingResponse(stream_wrapper(), media_type="text/event-stream")
+
+    @staticmethod
+    def should_enable_auto_chunking(messages: List) -> bool:
+        """
+        检查是否应该启用自动分片功能。
+
+        Args:
+            messages: 消息列表
+
+        Returns:
+            是否启用自动分片
+        """
+        if not AUTO_CHUNKING_ENABLED or not auto_chunking_available:
+            return False
+
+        # 检查消息内容是否超过阈值
+        total_chars = 0
+        for msg in messages:
+            if hasattr(msg, 'content'):
+                content = msg.content
+            elif isinstance(msg, dict):
+                content = msg.get("content", "")
+            else:
+                continue
+
+            if isinstance(content, str):
+                total_chars += len(content)
+            elif isinstance(content, list):
+                for block in content:
+                    if isinstance(block, dict) and block.get("type") == "text":
+                        total_chars += len(block.get("text", ""))
+
+        return total_chars > AUTO_CHUNK_THRESHOLD
 
     @staticmethod
     async def create_non_stream_response(

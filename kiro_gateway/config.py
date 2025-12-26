@@ -151,19 +151,20 @@ class Settings(BaseSettings):
     # ==================================================================================================
 
     # 等待模型首个 token 的超时时间（秒）
-    # 对于 Opus 等慢模型，建议设置为 60-120 秒
-    first_token_timeout: float = Field(default=60.0, alias="FIRST_TOKEN_TIMEOUT")
+    # 对于 Opus 等慢模型，建议设置为 120-180 秒
+    first_token_timeout: float = Field(default=120.0, alias="FIRST_TOKEN_TIMEOUT")
 
     # 首个 token 超时时的最大重试次数
-    first_token_max_retries: int = Field(default=5, alias="FIRST_TOKEN_MAX_RETRIES")
+    first_token_max_retries: int = Field(default=3, alias="FIRST_TOKEN_MAX_RETRIES")
 
     # 流式读取超时（秒）- 读取流中每个 chunk 的最大等待时间
-    # 对于 Opus 等慢模型，建议设置为 120-300 秒
-    stream_read_timeout: float = Field(default=120.0, alias="STREAM_READ_TIMEOUT")
+    # 对于慢模型会自动乘以倍数。建议设置为 180-300 秒
+    # 这是为了处理大文档时模型可能需要更长时间生成每个 chunk
+    stream_read_timeout: float = Field(default=300.0, alias="STREAM_READ_TIMEOUT")
 
     # 非流式请求超时（秒）- 等待完整响应的最大时间
-    # 对于复杂请求，建议设置为 300-600 秒
-    non_stream_timeout: float = Field(default=600.0, alias="NON_STREAM_TIMEOUT")
+    # 对于复杂请求，建议设置为 600-1200 秒
+    non_stream_timeout: float = Field(default=900.0, alias="NON_STREAM_TIMEOUT")
 
     # ==================================================================================================
     # 调试设置
@@ -181,6 +182,31 @@ class Settings(BaseSettings):
 
     # 速率限制：每分钟请求数（0 表示禁用）
     rate_limit_per_minute: int = Field(default=0, alias="RATE_LIMIT_PER_MINUTE")
+
+    # ==================================================================================================
+    # 慢模型配置
+    # ==================================================================================================
+
+    # 慢模型的超时倍数
+    # 对于 Opus 等慢模型，超时时间会乘以这个倍数
+    # 建议设置为 3.0-4.0，因为慢模型处理大文档时可能需要更长时间
+    slow_model_timeout_multiplier: float = Field(default=3.0, alias="SLOW_MODEL_TIMEOUT_MULTIPLIER")
+
+    # ==================================================================================================
+    # 自动分片配置（长文档处理）
+    # ==================================================================================================
+
+    # 是否启用自动分片功能
+    auto_chunking_enabled: bool = Field(default=False, alias="AUTO_CHUNKING_ENABLED")
+
+    # 触发自动分片的阈值（字符数）
+    auto_chunk_threshold: int = Field(default=150000, alias="AUTO_CHUNK_THRESHOLD")
+
+    # 每个分片的最大字符数
+    chunk_max_chars: int = Field(default=100000, alias="CHUNK_MAX_CHARS")
+
+    # 分片重叠字符数
+    chunk_overlap_chars: int = Field(default=2000, alias="CHUNK_OVERLAP_CHARS")
 
     @field_validator("log_level")
     @classmethod
@@ -235,6 +261,24 @@ NON_STREAM_TIMEOUT: float = settings.non_stream_timeout
 DEBUG_MODE: str = settings.debug_mode
 DEBUG_DIR: str = settings.debug_dir
 RATE_LIMIT_PER_MINUTE: int = settings.rate_limit_per_minute
+SLOW_MODEL_TIMEOUT_MULTIPLIER: float = settings.slow_model_timeout_multiplier
+AUTO_CHUNKING_ENABLED: bool = settings.auto_chunking_enabled
+AUTO_CHUNK_THRESHOLD: int = settings.auto_chunk_threshold
+CHUNK_MAX_CHARS: int = settings.chunk_max_chars
+CHUNK_OVERLAP_CHARS: int = settings.chunk_overlap_chars
+
+# ==================================================================================================
+# Slow Model Configuration
+# ==================================================================================================
+
+# 慢模型列表 - 这些模型需要更长的超时时间
+SLOW_MODELS: frozenset = frozenset({
+    "claude-opus-4-5",
+    "claude-opus-4-5-20251101",
+    "claude-3-opus",
+    "claude-3-opus-20240229",
+})
+
 
 # ==================================================================================================
 # Kiro API URL Templates
@@ -320,3 +364,27 @@ def get_internal_model_id(external_model: str) -> str:
         Kiro API internal model ID
     """
     return MODEL_MAPPING.get(external_model, external_model)
+
+
+def get_adaptive_timeout(model: str, base_timeout: float) -> float:
+    """
+    根据模型类型获取自适应超时时间。
+
+    对于慢模型（如 Opus），自动增加超时时间。
+
+    Args:
+        model: 模型名称
+        base_timeout: 基础超时时间
+
+    Returns:
+        调整后的超时时间
+    """
+    if not model:
+        return base_timeout
+
+    model_lower = model.lower()
+    for slow_model in SLOW_MODELS:
+        if slow_model.lower() in model_lower:
+            return base_timeout * SLOW_MODEL_TIMEOUT_MULTIPLIER
+
+    return base_timeout
