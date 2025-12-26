@@ -758,8 +758,16 @@ async def stream_kiro_to_anthropic(
     # 根据模型自适应调整超时时间
     adaptive_stream_read_timeout = get_adaptive_timeout(model, stream_read_timeout)
 
+    # Pre-calculate input_tokens (can be determined before stream starts)
+    # This ensures message_start event contains real input_tokens value
+    pre_calculated_input_tokens = 0
+    if request_messages:
+        pre_calculated_input_tokens += count_message_tokens(request_messages, apply_claude_correction=False)
+    if request_tools:
+        pre_calculated_input_tokens += count_tools_tokens(request_tools, apply_claude_correction=False)
+
     try:
-        # Отправляем message_start
+        # message_start
         message_start = {
             "type": "message_start",
             "message": {
@@ -770,9 +778,16 @@ async def stream_kiro_to_anthropic(
                 "model": model,
                 "stop_reason": None,
                 "stop_sequence": None,
-                "usage": {"input_tokens": 0, "output_tokens": 0}
+                "usage": {
+                    "input_tokens": pre_calculated_input_tokens,
+                    "output_tokens": 0,
+                    "cache_creation_input_tokens": 0,
+                    "cache_read_input_tokens": 0
+                }
             }
         }
+
+        
         yield f"event: message_start\ndata: {json.dumps(message_start, ensure_ascii=False)}\n\n"
 
         # Read chunks with adaptive timeout
