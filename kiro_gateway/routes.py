@@ -251,6 +251,11 @@ async def _parse_auth_header(auth_header: str, request: Request = None) -> tuple
         )
         return proxy_key, auth_manager, None, None
 
+    # Traditional mode: verify entire token as PROXY_API_KEY
+    if secrets.compare_digest(token, proxy_api_key):
+        logger.debug(f"[{get_timestamp()}] 传统模式: 使用全局 AuthManager")
+        return token, None, None, None
+
     # Check if it's a user API key (sk-xxx format)
     if token.startswith("sk-"):
         from kiro_gateway.database import user_db
@@ -284,15 +289,9 @@ async def _parse_auth_header(auth_header: str, request: Request = None) -> tuple
         except NoTokenAvailable as e:
             logger.warning(f"[{get_timestamp()}] 用户可用 Token 不足: 用户ID={user_id}, 错误={e}")
             raise HTTPException(status_code=503, detail="该用户暂无可用的 Token")
-    else:
-        # Traditional mode: verify entire token as PROXY_API_KEY
-        if not secrets.compare_digest(token, proxy_api_key):
-            logger.warning(f"[{get_timestamp()}] 传统模式下 API Key 无效")
-            raise HTTPException(status_code=401, detail="API Key 无效或缺失")
 
-        # Return None to indicate using global AuthManager
-        logger.debug(f"[{get_timestamp()}] 传统模式: 使用全局 AuthManager")
-        return token, None, None, None
+    logger.warning(f"[{get_timestamp()}] 传统模式下 API Key 无效")
+    raise HTTPException(status_code=401, detail="API Key 无效或缺失")
 
 
 async def verify_api_key(
@@ -377,6 +376,11 @@ async def verify_anthropic_api_key(
             )
             return auth_manager
 
+        # Traditional mode: verify entire x-api-key as PROXY_API_KEY
+        if secrets.compare_digest(x_api_key, proxy_api_key):
+            logger.debug(f"[{get_timestamp()}] x-api-key 传统模式: 使用全局 AuthManager")
+            return request.app.state.auth_manager
+
         # Check if it's a user API key (sk-xxx format)
         if x_api_key.startswith("sk-"):
             from kiro_gateway.database import user_db
@@ -407,11 +411,6 @@ async def verify_anthropic_api_key(
             except NoTokenAvailable as e:
                 logger.warning(f"[{get_timestamp()}] 用户可用 Token 不足: 用户ID={user_id}, 错误={e}")
                 raise HTTPException(status_code=503, detail="该用户暂无可用的 Token")
-        else:
-            # Traditional mode: verify entire x-api-key as PROXY_API_KEY
-            if secrets.compare_digest(x_api_key, proxy_api_key):
-                logger.debug(f"[{get_timestamp()}] x-api-key 传统模式: 使用全局 AuthManager")
-                return request.app.state.auth_manager
 
     # Try Authorization header (OpenAI format)
     if auth_header:
