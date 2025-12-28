@@ -1889,6 +1889,25 @@ async def user_create_key(
     }
 
 
+@router.put("/user/api/keys/{key_id}", include_in_schema=False)
+async def user_update_key(
+    request: Request,
+    key_id: int,
+    is_active: bool = Form(...),
+    _csrf: None = Depends(require_same_origin)
+):
+    """Enable or disable an API key."""
+    user = get_current_user(request)
+    if not user:
+        return JSONResponse(status_code=401, content={"error": "未登录"})
+
+    from kiro_gateway.database import user_db
+    success = user_db.set_api_key_active(key_id, user_id=user.id, is_active=is_active)
+    if not success:
+        return JSONResponse(status_code=404, content={"error": "API Key 不存在"})
+    return {"success": True}
+
+
 @router.delete("/user/api/keys/{key_id}", include_in_schema=False)
 async def user_delete_key(
     request: Request,

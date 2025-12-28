@@ -835,6 +835,7 @@ class UserDatabase:
         allowed_sort = {
             "key_prefix": "key_prefix",
             "name": "name",
+            "is_active": "is_active",
             "request_count": "request_count",
             "last_used": "last_used",
             "created_at": "created_at",
@@ -871,18 +872,31 @@ class UserDatabase:
         with self._get_conn() as conn:
             return conn.execute(query, params).fetchone()[0]
 
-    def revoke_api_key(self, key_id: int, user_id: Optional[int] = None) -> bool:
-        """Revoke an API key. If user_id provided, verify ownership."""
+    def set_api_key_active(
+        self,
+        key_id: int,
+        user_id: Optional[int] = None,
+        is_active: bool = True
+    ) -> bool:
+        """Enable/disable an API key. If user_id provided, verify ownership."""
+        value = 1 if is_active else 0
         with self._lock:
             with self._get_conn() as conn:
                 if user_id:
-                    conn.execute(
-                        "UPDATE api_keys SET is_active = 0 WHERE id = ? AND user_id = ?",
-                        (key_id, user_id)
+                    cursor = conn.execute(
+                        "UPDATE api_keys SET is_active = ? WHERE id = ? AND user_id = ?",
+                        (value, key_id, user_id)
                     )
                 else:
-                    conn.execute("UPDATE api_keys SET is_active = 0 WHERE id = ?", (key_id,))
-                return True
+                    cursor = conn.execute(
+                        "UPDATE api_keys SET is_active = ? WHERE id = ?",
+                        (value, key_id)
+                    )
+                return cursor.rowcount > 0
+
+    def revoke_api_key(self, key_id: int, user_id: Optional[int] = None) -> bool:
+        """Revoke an API key. If user_id provided, verify ownership."""
+        return self.set_api_key_active(key_id, user_id=user_id, is_active=False)
 
     def delete_api_key(self, key_id: int, user_id: Optional[int] = None) -> bool:
         """Delete an API key. If user_id provided, verify ownership."""
