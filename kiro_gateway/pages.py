@@ -5563,9 +5563,46 @@ def render_tokens_page(user=None) -> str:
 def render_login_page() -> str:
     """Render the login selection page with multiple OAuth2 providers."""
     from kiro_gateway.metrics import metrics
+    from kiro_gateway.config import OAUTH_CLIENT_ID, GITHUB_CLIENT_ID
 
     self_use_enabled = metrics.is_self_use_enabled()
     body_self_use_attr = "true" if self_use_enabled else "false"
+
+    # 检查哪些登录方式已配置
+    linuxdo_enabled = bool(OAUTH_CLIENT_ID)
+    github_enabled = bool(GITHUB_CLIENT_ID)
+
+    # 生成登录按钮 HTML
+    login_buttons = ""
+    if linuxdo_enabled:
+        login_buttons += '''
+          <a href="/oauth2/login" class="btn-login btn-linuxdo">
+            <img src="https://linux.do/uploads/default/optimized/4X/c/c/d/ccd8c210609d498cbeb3d5201d4c259348447562_2_32x32.png" width="24" height="24" alt="LinuxDo" style="border-radius: 6px; background: white; padding: 2px;">
+            <span>LinuxDo 登录</span>
+          </a>
+        '''
+
+    if github_enabled:
+        login_buttons += '''
+          <a href="/oauth2/github/login" class="btn-login btn-github">
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z"/></svg>
+            <span>GitHub 登录</span>
+          </a>
+        '''
+
+    # 如果没有配置任何登录方式，显示提示
+    if not login_buttons:
+        login_buttons = '''
+          <div class="p-6 rounded-lg text-center" style="background: rgba(245, 158, 11, 0.12); border: 1px solid rgba(245, 158, 11, 0.35);">
+            <div class="text-3xl mb-3">⚠️</div>
+            <p class="font-medium mb-2" style="color: #d97706;">OAuth2 登录未配置</p>
+            <p class="text-sm" style="color: var(--text-muted);">请在 .env 文件中配置 LinuxDo 或 GitHub OAuth2 凭证</p>
+            <div class="mt-4 text-xs" style="color: var(--text-muted);">
+              参考文档：<a href="/docs" class="text-indigo-400 hover:underline">配置指南</a>
+            </div>
+          </div>
+        '''
+
     return f'''<!DOCTYPE html>
 <html lang="zh">
 <head>{COMMON_HEAD}
@@ -5617,15 +5654,7 @@ def render_login_page() -> str:
         </div>
 
         <div class="space-y-4">
-          <a href="/oauth2/login" class="btn-login btn-linuxdo">
-            <img src="https://linux.do/uploads/default/optimized/4X/c/c/d/ccd8c210609d498cbeb3d5201d4c259348447562_2_32x32.png" width="24" height="24" alt="LinuxDo" style="border-radius: 6px; background: white; padding: 2px;">
-            <span>LinuxDo 登录</span>
-          </a>
-
-          <a href="/oauth2/github/login" class="btn-login btn-github">
-            <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z"/></svg>
-            <span>GitHub 登录</span>
-          </a>
+          {login_buttons}
         </div>
 
         <div class="my-8 flex items-center">
