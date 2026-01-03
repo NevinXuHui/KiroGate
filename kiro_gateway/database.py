@@ -153,6 +153,7 @@ class UserDatabase:
                     id INTEGER PRIMARY KEY AUTOINCREMENT,
                     user_id INTEGER NOT NULL,
                     key_hash TEXT UNIQUE NOT NULL,
+                    key_encrypted TEXT NOT NULL,
                     key_prefix TEXT NOT NULL,
                     name TEXT,
                     is_active INTEGER DEFAULT 1,
@@ -226,6 +227,18 @@ class UserDatabase:
             if "allow_guest" not in announcement_columns:
                 conn.execute(
                     "ALTER TABLE announcements ADD COLUMN allow_guest INTEGER DEFAULT 0"
+                )
+            # Add key_encrypted column to api_keys table if not exists
+            api_keys_columns = {row[1] for row in conn.execute("PRAGMA table_info(api_keys)")}
+            if "key_encrypted" not in api_keys_columns:
+                conn.execute(
+                    "ALTER TABLE api_keys ADD COLUMN key_encrypted TEXT"
+                )
+            # Add key_encrypted column to import_keys table if not exists
+            import_keys_columns = {row[1] for row in conn.execute("PRAGMA table_info(import_keys)")}
+            if "key_encrypted" not in import_keys_columns:
+                conn.execute(
+                    "ALTER TABLE import_keys ADD COLUMN key_encrypted TEXT"
                 )
             conn.commit()
         logger.info(f"User database initialized: {self._db_path}")
@@ -905,15 +918,16 @@ class UserDatabase:
         random_part = secrets.token_hex(24)  # 48 chars
         plain_key = f"sk-{random_part}"
         key_hash = hashlib.sha256(plain_key.encode()).hexdigest()
+        key_encrypted = self._encrypt_token(plain_key)
         key_prefix = f"sk-{random_part[:4]}...{random_part[-4:]}"
         now = int(time.time() * 1000)
 
         with self._lock:
             with self._get_conn() as conn:
                 cursor = conn.execute(
-                    """INSERT INTO api_keys (user_id, key_hash, key_prefix, name, created_at)
-                       VALUES (?, ?, ?, ?, ?)""",
-                    (user_id, key_hash, key_prefix, name, now)
+                    """INSERT INTO api_keys (user_id, key_hash, key_encrypted, key_prefix, name, created_at)
+                       VALUES (?, ?, ?, ?, ?, ?)""",
+                    (user_id, key_hash, key_encrypted, key_prefix, name, now)
                 )
                 key_id = cursor.lastrowid
                 api_key = APIKey(
@@ -938,15 +952,16 @@ class UserDatabase:
         random_part = secrets.token_hex(24)
         plain_key = f"ik-{random_part}"
         key_hash = hashlib.sha256(plain_key.encode()).hexdigest()
+        key_encrypted = self._encrypt_token(plain_key)
         key_prefix = f"ik-{random_part[:4]}...{random_part[-4:]}"
         now = int(time.time() * 1000)
 
         with self._lock:
             with self._get_conn() as conn:
                 cursor = conn.execute(
-                    """INSERT INTO import_keys (user_id, key_hash, key_prefix, name, created_at)
-                       VALUES (?, ?, ?, ?, ?)""",
-                    (user_id, key_hash, key_prefix, name, now)
+                    """INSERT INTO import_keys (user_id, key_hash, key_encrypted, key_prefix, name, created_at)
+                       VALUES (?, ?, ?, ?, ?, ?)""",
+                    (user_id, key_hash, key_encrypted, key_prefix, name, now)
                 )
                 key_id = cursor.lastrowid
                 import_key = ImportKey(
@@ -1138,6 +1153,53 @@ class UserDatabase:
                     "SELECT COUNT(*) FROM api_keys WHERE user_id = ? AND is_active = 1", (user_id,)
                 ).fetchone()[0]
             return conn.execute("SELECT COUNT(*) FROM api_keys WHERE is_active = 1").fetchone()[0]
+
+    def get_decrypted_api_key(self, key_id: int, user_id: Optional[int] = None) -> Optional[str]:
+        """
+        Get decrypted API key by ID.
+
+        Args:
+            key_id: API key ID
+            user_id: Optional user ID for ownership verification
+
+        Returns:
+            Decrypted API key string if found and authorized, None otherwise
+        """
+        with self._get_conn() as conn:
+            if user_id:
+                row = conn.execute(
+                    "SELECT key_encrypted FROM api_keys WHERE id = ? AND user_id = ?",
+                    (key_id, user_id)
+                ).fetchone()
+            else:
+                row = conn.execute(
+                    "SELECT key_encrypted FROM api_keys WHERE id = ?",
+                    (key_id,)
+                ).fetchone()
+
+            if row and row["key_encrypted"]:
+                return self._decrypt_token(row["key_encrypted"])
+            return None
+
+    def get_decrypted_import_key(self, key_id: int) -> Optional[str]:
+        """
+        Get decrypted import key by ID (admin only).
+
+        Args:
+            key_id: Import key ID
+
+        Returns:
+            Decrypted import key string if found, None otherwise
+        """
+        with self._get_conn() as conn:
+            row = conn.execute(
+                "SELECT key_encrypted FROM import_keys WHERE id = ?",
+                (key_id,)
+            ).fetchone()
+
+            if row and row["key_encrypted"]:
+                return self._decrypt_token(row["key_encrypted"])
+            return None
 
     def _row_to_apikey(self, row: sqlite3.Row) -> APIKey:
         """Convert database row to APIKey object."""

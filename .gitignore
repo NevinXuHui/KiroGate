@@ -1,5 +1,5 @@
 # Environment
-.env
+# .env
 .env.local
 
 # IDE
@@ -32,3 +32,5 @@ htmlcov/
 
 # Data files
 data/
+.history
+.lh

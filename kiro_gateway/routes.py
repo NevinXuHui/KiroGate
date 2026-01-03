@@ -2878,6 +2878,42 @@ async def user_delete_key(
     return {"success": success}
 
 
+@router.get("/user/api/keys/{key_id}/reveal", include_in_schema=False)
+async def user_reveal_key(
+    request: Request,
+    key_id: int
+):
+    """Reveal the full API key (decrypted)."""
+    user = get_current_user(request)
+    if not user:
+        return JSONResponse(status_code=401, content={"error": "未登录"})
+
+    from kiro_gateway.database import user_db
+    plain_key = user_db.get_decrypted_api_key(key_id, user_id=user.id)
+    if not plain_key:
+        return JSONResponse(status_code=404, content={"error": "API Key 不存在"})
+
+    return {"success": True, "key": plain_key}
+
+
+@router.get("/admin/api/import-keys/{key_id}/reveal", include_in_schema=False)
+async def admin_reveal_import_key(
+    request: Request,
+    key_id: int
+):
+    """Reveal the full import key (decrypted) - admin only."""
+    session = request.cookies.get("admin_session")
+    if not verify_admin_session(session):
+        return JSONResponse(status_code=401, content={"error": "未授权"})
+
+    from kiro_gateway.database import user_db
+    plain_key = user_db.get_decrypted_import_key(key_id)
+    if not plain_key:
+        return JSONResponse(status_code=404, content={"error": "Import Key 不存在"})
+
+    return {"success": True, "key": plain_key}
+
+
 # ==================== Public Token Pool ====================
 
 @router.get("/tokens", response_class=HTMLResponse, include_in_schema=False)

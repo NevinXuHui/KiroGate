@@ -5073,6 +5073,7 @@ def render_user_page(user) -> str:
           <td class="py-3 px-3">${{k.last_used ? new Date(k.last_used).toLocaleString() : '-'}}</td>
           <td class="py-3 px-3">${{k.created_at ? new Date(k.created_at).toLocaleString() : '-'}}</td>
           <td class="py-3 px-3">
+            <button onclick="revealKey(${{k.id}})" class="text-xs px-2 py-1 rounded bg-blue-500/20 text-blue-400 hover:bg-blue-500/30 mr-1">查看</button>
             <button onclick="setKeyActive(${{k.id}}, ${{nextActive}})" class="text-xs px-2 py-1 rounded ${{toggleClass}} mr-1">${{toggleLabel}}</button>
             <button onclick="deleteKey(${{k.id}})" class="text-xs px-2 py-1 rounded bg-red-500/20 text-red-400 hover:bg-red-500/30">删除</button>
           </td>
@@ -5481,6 +5482,57 @@ def render_user_page(user) -> str:
       await fetch('/user/api/keys/' + keyId, {{ method: 'DELETE' }});
       loadKeys();
       loadProfile();
+    }}
+
+    async function revealKey(keyId) {{
+      try {{
+        const response = await fetch('/user/api/keys/' + keyId + '/reveal');
+        const data = await response.json();
+        if (!response.ok || !data.success) {{
+          throw new Error(data.error || '获取失败');
+        }}
+
+        // 显示完整的 API Key 在模态框中
+        const modal = document.createElement('div');
+        modal.style.cssText = 'position: fixed; inset: 0; background: rgba(0,0,0,0.7); display: flex; align-items: center; justify-content: center; z-index: 9999;';
+        modal.innerHTML = `
+          <div class="card" style="max-width: 600px; width: 90%; padding: 24px;">
+            <div class="flex items-center justify-between mb-4">
+              <h3 class="text-xl font-bold">API Key</h3>
+              <button onclick="this.closest('[style*=\\'position: fixed\\']').remove()" class="text-2xl hover:opacity-70">&times;</button>
+            </div>
+            <div class="mb-4">
+              <label class="block text-sm mb-2" style="color: var(--text-muted);">完整密钥（请妥善保管）</label>
+              <div class="flex gap-2">
+                <input type="text" readonly value="${{data.key}}" id="revealedKey" class="flex-1 px-3 py-2 rounded-lg font-mono text-sm" style="background: var(--bg-input); border: 1px solid var(--border);">
+                <button onclick="copyRevealedKey()" class="btn-primary px-4">复制</button>
+              </div>
+              <div id="revealCopyStatus" class="text-sm mt-2 text-green-400" style="display: none;">✓ 已复制到剪贴板</div>
+            </div>
+            <div class="text-sm p-3 rounded-lg" style="background: var(--bg-hover); color: var(--text-muted);">
+              <strong>⚠️ 安全提示：</strong>请勿将 API Key 分享给他人或提交到公开代码仓库。
+            </div>
+          </div>
+        `;
+        document.body.appendChild(modal);
+      }} catch (e) {{
+        showConfirmModal({{
+          title: '获取失败',
+          message: e.message || '无法获取 API Key，请稍后重试',
+          icon: '❌',
+          confirmText: '好的',
+          danger: false
+        }});
+      }}
+    }}
+
+    function copyRevealedKey() {{
+      const input = document.getElementById('revealedKey');
+      input.select();
+      document.execCommand('copy');
+      const status = document.getElementById('revealCopyStatus');
+      status.style.display = 'block';
+      setTimeout(() => {{ status.style.display = 'none'; }}, 2000);
     }}
 
     // 公开 Token 池状态
