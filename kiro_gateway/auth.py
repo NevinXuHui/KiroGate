@@ -392,11 +392,12 @@ class KiroAuthManager:
         Returns:
             Usage data dict containing usageBreakdownList, subscriptionInfo, etc.
             Returns None on error.
+        
+        Note: This API may not be available for all account types.
         """
         try:
             token = await self.get_access_token()
             
-            # 如果 profile_arn 为空，尝试从 token refresh 响应中获取
             if not self._profile_arn:
                 logger.warning("profile_arn is empty, GetSubscriptionUsage may fail")
             
@@ -417,8 +418,11 @@ class KiroAuthManager:
                     data = response.json()
                     logger.debug(f"GetSubscriptionUsage success: {list(data.keys()) if data else 'empty'}")
                     return data
+                elif response.status_code == 404:
+                    logger.info("GetSubscriptionUsage API not available (404)")
+                    return None
                 else:
-                    logger.warning(f"GetSubscriptionUsage failed: HTTP {response.status_code}, body={response.text[:500]}")
+                    logger.warning(f"GetSubscriptionUsage failed: HTTP {response.status_code}, body={response.text[:200]}")
                     return None
 
         except Exception as e:

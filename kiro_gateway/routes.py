@@ -2838,7 +2838,7 @@ async def user_refresh_token_usage(
             user_db.update_token_usage_data(token_id, json_module.dumps(usage_data))
             return {"success": True, "usage_data": usage_data}
         else:
-            return {"success": False, "message": "无法获取配额信息，请检查 Token 是否有效"}
+            return {"success": False, "message": "配额 API 暂不可用，此功能可能不支持当前账号类型"}
     except Exception as e:
         logger.error(f"刷新 Token 配额失败: {e}", exc_info=True)
         return {"success": False, "message": f"刷新失败: {str(e)}"}
