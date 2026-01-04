@@ -2728,6 +2728,19 @@ def render_admin_page() -> str:
               <span class="slider"></span>
             </label>
           </div>
+          <div class="mt-4 p-4 rounded-lg" style="background: var(--bg-input);">
+            <div class="font-medium mb-2">强制模型</div>
+            <div class="text-sm mb-3" style="color: var(--text-muted);">覆盖所有客户端请求的模型</div>
+            <select id="forceModelSelect" onchange="saveForceModel(this.value)" class="w-full rounded px-3 py-2"
+              style="background: var(--bg-card); border: 1px solid var(--border); color: var(--text);">
+              <option value="">不强制（使用客户端请求的模型）</option>
+              <option value="claude-opus-4-5">claude-opus-4-5（顶级模型）</option>
+              <option value="claude-sonnet-4-5">claude-sonnet-4-5（增强模型）</option>
+              <option value="claude-sonnet-4">claude-sonnet-4（平衡模型）</option>
+              <option value="claude-haiku-4-5">claude-haiku-4-5（快速模型）</option>
+              <option value="claude-3-7-sonnet-20250219">claude-3-7-sonnet（旧版）</option>
+            </select>
+          </div>
         </div>
 
         <div class="card">
@@ -3521,6 +3534,30 @@ def render_admin_page() -> str:
       refreshStats();
     }}
 
+    async function saveForceModel(model) {{
+      const fd = new FormData();
+      fd.append('model', model);
+      try {{
+        const r = await fetch('/admin/api/force-model', {{ method: 'POST', body: fd }});
+        const d = await r.json();
+        if (d.success) {{
+          alert('强制模型已更新' + (model ? `：${{model}}` : '：已关闭'));
+        }} else {{
+          alert(d.error || '保存失败');
+        }}
+      }} catch (e) {{
+        alert('保存失败');
+      }}
+    }}
+
+    async function refreshForceModel() {{
+      try {{
+        const d = await fetchJson('/admin/api/force-model');
+        const select = document.getElementById('forceModelSelect');
+        if (select) select.value = d.force_model || '';
+      }} catch (e) {{ console.error(e); }}
+    }}
+
     async function refreshToken() {{
       const r = await fetch('/admin/api/refresh-token', {{ method: 'POST' }});
       const d = await r.json();
@@ -4095,6 +4132,7 @@ def render_admin_page() -> str:
     refreshStats();
     refreshAnnouncement();
     refreshProxyApiKey();
+    refreshForceModel();
     loadDbInfo();
     resetDbImportState('请先上传并解析导出文件。');
     const dbImportFile = document.getElementById('dbImportFile');
@@ -4224,6 +4262,7 @@ def render_user_page(user) -> str:
     <div class="flex gap-2 mb-4 border-b" style="border-color: var(--border);">
       <button class="tab px-4 py-2 font-medium" onclick="showTab('tokens')" id="tab-tokens">🔑 Token 管理</button>
       <button class="tab px-4 py-2 font-medium" onclick="showTab('keys')" id="tab-keys">🗝️ API Keys</button>
+      <button class="tab px-4 py-2 font-medium" onclick="showTab('settings')" id="tab-settings">⚙️ 设置</button>
     </div>
     <div id="panel-tokens" class="tab-panel">
       <div class="card">
@@ -4422,6 +4461,24 @@ def render_user_page(user) -> str:
           💡 API Key 仅在创建时显示一次，请妥善保存。使用方式: <code class="bg-black/20 px-1 rounded">Authorization: Bearer sk-xxx</code><br>
           ⚠️ 每个账户最多可创建 <strong>10</strong> 个 API Key
         </p>
+      </div>
+    </div>
+    <div id="panel-settings" class="tab-panel" style="display: none;">
+      <div class="card">
+        <h2 class="text-lg font-bold mb-4">⚙️ 模型设置</h2>
+        <div class="p-4 rounded-lg" style="background: var(--bg-input);">
+          <div class="font-medium mb-2">强制模型</div>
+          <div class="text-sm mb-3" style="color: var(--text-muted);">覆盖所有请求使用的模型，留空则使用客户端请求的模型</div>
+          <select id="forceModelSelect" onchange="saveForceModel(this.value)" class="w-full rounded px-3 py-2"
+            style="background: var(--bg-card); border: 1px solid var(--border); color: var(--text);">
+            <option value="">不强制（使用客户端请求的模型）</option>
+            <option value="claude-opus-4-5">claude-opus-4-5（顶级模型）</option>
+            <option value="claude-sonnet-4-5">claude-sonnet-4-5（增强模型）</option>
+            <option value="claude-sonnet-4">claude-sonnet-4（平衡模型）</option>
+            <option value="claude-haiku-4-5">claude-haiku-4-5（快速模型）</option>
+            <option value="claude-3-7-sonnet-20250219">claude-3-7-sonnet（旧版）</option>
+          </select>
+        </div>
       </div>
     </div>
   </main>
@@ -4761,6 +4818,33 @@ def render_user_page(user) -> str:
       document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
       document.getElementById('panel-' + tab).style.display = 'block';
       document.getElementById('tab-' + tab).classList.add('active');
+      if (tab === 'settings') refreshForceModel();
+    }}
+
+    // 强制模型设置
+    async function saveForceModel(model) {{
+      const fd = new FormData();
+      fd.append('model', model);
+      try {{
+        const r = await fetch('/user/api/force-model', {{ method: 'POST', body: fd }});
+        const d = await r.json();
+        if (d.success) {{
+          alert('强制模型已更新' + (model ? `：${{model}}` : '：已关闭'));
+        }} else {{
+          alert(d.error || '保存失败');
+        }}
+      }} catch (e) {{
+        alert('保存失败');
+      }}
+    }}
+
+    async function refreshForceModel() {{
+      try {{
+        const r = await fetch('/user/api/force-model');
+        const d = await r.json();
+        const select = document.getElementById('forceModelSelect');
+        if (select) select.value = d.force_model || '';
+      }} catch (e) {{ console.error(e); }}
     }}
 
     // 自定义确认对话框

@@ -1186,6 +1186,35 @@ async def admin_toggle_self_use(
     success = metrics.set_self_use_enabled(enabled)
     return {"success": success, "enabled": enabled}
 
+
+@router.get("/admin/api/force-model", include_in_schema=False)
+async def admin_get_force_model(request: Request):
+    """Get force model setting."""
+    session = request.cookies.get("admin_session")
+    if not verify_admin_session(session):
+        return JSONResponse(status_code=401, content={"error": "未授权"})
+    from kiro_gateway.config import settings
+    return {"force_model": settings.force_model}
+
+
+@router.post("/admin/api/force-model", include_in_schema=False)
+async def admin_set_force_model(
+    request: Request,
+    model: str = Form(""),
+    _csrf: None = Depends(require_same_origin)
+):
+    """Update force model setting."""
+    session = request.cookies.get("admin_session")
+    if not verify_admin_session(session):
+        return JSONResponse(status_code=401, content={"error": "未授权"})
+    from kiro_gateway.config import settings, AVAILABLE_MODELS
+    model = model.strip()
+    if model and model not in AVAILABLE_MODELS:
+        return JSONResponse(status_code=400, content={"error": f"无效的模型: {model}"})
+    settings.force_model = model
+    return {"success": True, "force_model": model}
+
+
 @router.get("/admin/api/proxy-key", include_in_schema=False)
 async def admin_get_proxy_key(request: Request):
     """Get proxy API key."""

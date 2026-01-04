@@ -434,6 +434,12 @@ class RequestHandler:
         auth_manager: KiroAuthManager = getattr(request.state, 'auth_manager', None) or request.app.state.auth_manager
         model_cache: ModelInfoCache = request.app.state.model_cache
 
+        # 强制模型覆盖
+        if settings.force_model:
+            original_model = request_data.model
+            request_data.model = settings.force_model
+            logger.info(f"Force model override: {original_model} -> {settings.force_model}")
+
         # 准备日志
         RequestHandler.prepare_request_logging(request_data)
 

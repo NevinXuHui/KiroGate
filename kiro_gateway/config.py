@@ -133,6 +133,10 @@ class Settings(BaseSettings):
     # 模型缓存 TTL（秒）
     model_cache_ttl: int = Field(default=3600, alias="MODEL_CACHE_TTL")
 
+    # 强制使用指定模型（覆盖客户端请求的模型）
+    # 留空表示不强制，使用客户端请求的模型
+    force_model: str = Field(default="", alias="FORCE_MODEL")
+
     # 默认最大输入 token 数
     default_max_input_tokens: int = Field(default=200000)
 
@@ -380,6 +384,7 @@ TOKEN_REFRESH_THRESHOLD: int = settings.token_refresh_threshold
 MAX_RETRIES: int = settings.max_retries
 BASE_RETRY_DELAY: float = settings.base_retry_delay
 MODEL_CACHE_TTL: int = settings.model_cache_ttl
+FORCE_MODEL: str = settings.force_model
 DEFAULT_MAX_INPUT_TOKENS: int = settings.default_max_input_tokens
 TOOL_DESCRIPTION_MAX_LENGTH: int = settings.tool_description_max_length
 LOG_LEVEL: str = settings.log_level
