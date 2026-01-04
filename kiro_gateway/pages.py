@@ -287,11 +287,14 @@ COMMON_HEAD = r'''
     /* 表格响应式 */
     .table-responsive {{
       overflow-x: auto;
+      overflow-y: auto;
+      max-height: 600px;
       -webkit-overflow-scrolling: touch;
       border-radius: 0.75rem;
     }}
     .table-responsive::-webkit-scrollbar {{
       height: 6px;
+      width: 6px;
     }}
     .table-responsive::-webkit-scrollbar-track {{
       background: transparent;
@@ -1986,7 +1989,7 @@ async function refreshData(){{
     sc.data.datasets[0].data=[d.successRequests||0,d.failedRequests||0];
     sc.update();
 
-    const rq=(d.recentRequests||[]).slice(-10).reverse();
+    const rq=(d.recentRequests||[]).reverse();
     const tb=document.getElementById('recentRequestsTable');
     const formatClient=(ua)=>{{
       if(!ua)return '-';
@@ -2003,7 +2006,7 @@ async function refreshData(){{
       if(ua.includes('axios'))return 'Axios';
       if(ua.includes('node-fetch')||ua.includes('Node'))return 'Node.js';
       if(ua.includes('curl'))return 'cURL';
-      if(ua.length>20)return ua.substring(0,20)+'...';
+      if(ua.length>30)return ua.substring(0,30)+'...';
       return ua||'-';
     }};
     tb.innerHTML=rq.length?rq.map(q=>`
