@@ -2826,14 +2826,21 @@ async def user_refresh_token_usage(
             region=cfg.region,
             profile_arn=cfg.profile_arn
         )
+        # 先获取 access token 验证 refresh token 是否有效
+        try:
+            await temp_manager.get_access_token()
+        except Exception as auth_err:
+            logger.warning(f"Token {token_id} 认证失败: {auth_err}")
+            return {"success": False, "message": f"Token 认证失败: {str(auth_err)}"}
+        
         usage_data = await temp_manager.get_subscription_usage()
         if usage_data:
             user_db.update_token_usage_data(token_id, json_module.dumps(usage_data))
             return {"success": True, "usage_data": usage_data}
         else:
-            return {"success": False, "message": "无法获取配额信息"}
+            return {"success": False, "message": "无法获取配额信息，请检查 Token 是否有效"}
     except Exception as e:
-        logger.error(f"刷新 Token 配额失败: {e}")
+        logger.error(f"刷新 Token 配额失败: {e}", exc_info=True)
         return {"success": False, "message": f"刷新失败: {str(e)}"}
 
 

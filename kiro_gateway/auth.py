@@ -395,25 +395,32 @@ class KiroAuthManager:
         """
         try:
             token = await self.get_access_token()
+            
+            # 如果 profile_arn 为空，尝试从 token refresh 响应中获取
+            if not self._profile_arn:
+                logger.warning("profile_arn is empty, GetSubscriptionUsage may fail")
+            
             from kiro_gateway.utils import get_kiro_headers
             headers = get_kiro_headers(self, token)
 
+            url = f"{self._q_host}/GetSubscriptionUsage"
+            params = {"origin": "AI_EDITOR"}
+            if self._profile_arn:
+                params["profileArn"] = self._profile_arn
+            
+            logger.debug(f"GetSubscriptionUsage request: url={url}, profileArn={self._profile_arn}")
+
             async with httpx.AsyncClient(timeout=30) as client:
-                response = await client.get(
-                    f"{self._q_host}/GetSubscriptionUsage",
-                    headers=headers,
-                    params={
-                        "origin": "AI_EDITOR",
-                        "profileArn": self._profile_arn or ""
-                    }
-                )
+                response = await client.get(url, headers=headers, params=params)
 
                 if response.status_code == 200:
-                    return response.json()
+                    data = response.json()
+                    logger.debug(f"GetSubscriptionUsage success: {list(data.keys()) if data else 'empty'}")
+                    return data
                 else:
-                    logger.warning(f"GetSubscriptionUsage failed: HTTP {response.status_code}")
+                    logger.warning(f"GetSubscriptionUsage failed: HTTP {response.status_code}, body={response.text[:500]}")
                     return None
 
         except Exception as e:
-            logger.error(f"Error getting subscription usage: {e}")
+            logger.error(f"Error getting subscription usage: {e}", exc_info=True)
             return None
