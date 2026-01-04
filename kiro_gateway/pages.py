@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 
 """
-KiroGate Frontend Pages.
+徐辉牛逼 Frontend Pages.
 
 HTML templates for the web interface.
 """
@@ -36,23 +36,23 @@ PROXY_BASE = STATIC_ASSETS_PROXY_BASE if STATIC_ASSETS_PROXY_ENABLED else ""
 COMMON_HEAD = r'''
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>KiroGate - OpenAI & Anthropic 兼容的 Kiro API 代理网关</title>
+  <title>徐辉牛逼 - OpenAI & Anthropic 兼容的 Kiro API 代理网关</title>
 
   <!-- SEO Meta Tags -->
-  <meta name="description" content="KiroGate 是一个开源的 Kiro IDE API 代理网关，支持 OpenAI 和 Anthropic API 格式，让你可以通过任何兼容的工具使用 Claude 模型。支持流式传输、工具调用、多租户等特性。">
-  <meta name="keywords" content="KiroGate, Kiro, Claude, OpenAI, Anthropic, API Gateway, Proxy, AI, LLM, Claude Code, Python, FastAPI, 代理网关">
-  <meta name="author" content="KiroGate">
+  <meta name="description" content="徐辉牛逼 是一个开源的 Kiro IDE API 代理网关，支持 OpenAI 和 Anthropic API 格式，让你可以通过任何兼容的工具使用 Claude 模型。支持流式传输、工具调用、多租户等特性。">
+  <meta name="keywords" content="徐辉牛逼, Kiro, Claude, OpenAI, Anthropic, API Gateway, Proxy, AI, LLM, Claude Code, Python, FastAPI, 代理网关">
+  <meta name="author" content="徐辉牛逼">
   <meta name="robots" content="index, follow">
 
   <!-- Open Graph / Facebook -->
   <meta property="og:type" content="website">
-  <meta property="og:title" content="KiroGate - OpenAI & Anthropic 兼容的 Kiro API 代理网关">
+  <meta property="og:title" content="徐辉牛逼 - OpenAI & Anthropic 兼容的 Kiro API 代理网关">
   <meta property="og:description" content="开源的 Kiro IDE API 代理网关，支持 OpenAI 和 Anthropic API 格式，通过任何兼容工具使用 Claude 模型。">
-  <meta property="og:site_name" content="KiroGate">
+  <meta property="og:site_name" content="徐辉牛逼">
 
   <!-- Twitter -->
   <meta name="twitter:card" content="summary_large_image">
-  <meta name="twitter:title" content="KiroGate - OpenAI & Anthropic 兼容的 Kiro API 代理网关">
+  <meta name="twitter:title" content="徐辉牛逼 - OpenAI & Anthropic 兼容的 Kiro API 代理网关">
   <meta name="twitter:description" content="开源的 Kiro IDE API 代理网关，支持 OpenAI 和 Anthropic API 格式，通过任何兼容工具使用 Claude 模型。">
 
   <!-- Favicon -->
@@ -590,7 +590,7 @@ COMMON_NAV = r'''
         <div class="flex items-center space-x-8">
           <a href="/" class="flex items-center gap-2 text-2xl font-bold group">
             <span class="text-2xl group-hover:scale-110 transition-transform">⚡</span>
-            <span class="gradient-text">KiroGate</span>
+            <span class="gradient-text">徐辉牛逼</span>
           </a>
           <div class="hidden md:flex space-x-6">
             <a href="/" class="nav-link">首页</a>
@@ -826,7 +826,7 @@ COMMON_FOOTER = '''
       <div class="flex flex-col items-center">
         <div class="flex items-center gap-2 mb-4">
           <span class="text-2xl">⚡</span>
-          <span class="text-xl font-bold gradient-text">KiroGate</span>
+          <span class="text-xl font-bold gradient-text">徐辉牛逼</span>
         </div>
         <p class="text-sm text-center mb-4" style="color: var(--text-muted);">OpenAI & Anthropic 兼容的 Kiro API 网关</p>
         <div class="flex flex-wrap justify-center gap-x-6 gap-y-2 text-sm mb-6">
@@ -871,7 +871,7 @@ def render_home_page() -> str:
           <span class="text-sm" style="color: var(--text-muted);">服务运行中</span>
         </div>
         <h1 class="text-4xl sm:text-5xl md:text-6xl font-bold mb-6">
-          <span class="gradient-text">KiroGate</span>
+          <span class="gradient-text">徐辉牛逼</span>
           <span style="color: var(--text);"> API 网关</span>
         </h1>
         <p class="text-lg sm:text-xl mb-8 max-w-2xl mx-auto px-4" style="color: var(--text-muted);">
@@ -1033,7 +1033,7 @@ def render_docs_page() -> str:
       <h1 class="text-4xl font-bold mb-4">
         <span class="gradient-text">API 文档</span>
       </h1>
-      <p style="color: var(--text-muted);">快速上手 KiroGate API</p>
+      <p style="color: var(--text-muted);">快速上手 徐辉牛逼 API</p>
     </div>
 
     <div class="space-y-8">
@@ -1232,7 +1232,7 @@ def render_playground_page() -> str:
       <h1 class="text-4xl font-bold mb-4">
         <span class="gradient-text">API Playground</span>
       </h1>
-      <p style="color: var(--text-muted);">在线测试 KiroGate API</p>
+      <p style="color: var(--text-muted);">在线测试 徐辉牛逼 API</p>
     </div>
 
     <div class="grid lg:grid-cols-2 gap-6">
@@ -1532,7 +1532,7 @@ def render_deploy_page() -> str:
       <h1 class="text-4xl font-bold mb-4">
         <span class="gradient-text">部署指南</span>
       </h1>
-      <p style="color: var(--text-muted);">快速部署你自己的 KiroGate 实例</p>
+      <p style="color: var(--text-muted);">快速部署你自己的 徐辉牛逼 实例</p>
     </div>
 
     <div class="space-y-8">
@@ -2145,7 +2145,7 @@ def render_admin_login_page(error: str = "") -> str:
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Admin Login - KiroGate</title>
+  <title>Admin Login - 徐辉牛逼</title>
   <meta name="robots" content="noindex, nofollow">
   <script src="{get_asset_url("cdn.tailwindcss.com")}"></script>
   <style>
@@ -2165,7 +2165,7 @@ def render_admin_login_page(error: str = "") -> str:
       <div class="text-center mb-8">
         <span class="text-4xl">🔐</span>
         <h1 class="text-2xl font-bold mt-4">Admin Login</h1>
-        <p class="text-sm mt-2" style="color: var(--text-muted);">KiroGate 管理后台</p>
+        <p class="text-sm mt-2" style="color: var(--text-muted);">徐辉牛逼 管理后台</p>
       </div>
 
       {error_html}
@@ -2301,7 +2301,7 @@ def render_admin_page() -> str:
       <div class="flex items-center gap-4">
         <a href="/" class="flex items-center gap-2 text-xl font-bold" style="color: var(--text); text-decoration: none;">
           <span>⚡</span>
-          <span class="hidden sm:inline">KiroGate</span>
+          <span class="hidden sm:inline">徐辉牛逼</span>
         </a>
         <span class="inline-flex items-center gap-1 px-2 py-1 rounded text-xs font-medium admin-tag">🛡️ Admin</span>
       </div>
@@ -4240,7 +4240,7 @@ def render_user_page(user) -> str:
       <div class="flex items-start gap-3">
         <div class="text-2xl">🧭</div>
         <div>
-          <h2 id="guideTitle" class="font-bold">欢迎使用 KiroGate</h2>
+          <h2 id="guideTitle" class="font-bold">欢迎使用 徐辉牛逼</h2>
           <p id="guideText" class="text-sm mt-1" style="color: var(--text-muted);">两步即可开始调用：先添加 Token，再生成 API Key。</p>
           <div id="guideActions" class="flex flex-wrap gap-2 mt-3">
             <button type="button" onclick="showTab('tokens'); showTokenSubTab('mine'); showDonateModal();" class="btn-primary text-sm px-3 py-1.5">添加 Token</button>
@@ -6044,7 +6044,7 @@ def render_login_page() -> str:
       <div class="login-card p-8">
         <div class="text-center mb-8">
           <div class="logo-bounce inline-block text-6xl mb-4">⚡</div>
-          <h1 class="text-2xl font-bold mb-2">欢迎使用 KiroGate</h1>
+          <h1 class="text-2xl font-bold mb-2">欢迎使用 徐辉牛逼</h1>
           <p style="color: var(--text-muted);">选择登录方式开始使用</p>
         </div>
         <div class="self-use-only mb-6 px-4 py-3 rounded-lg text-sm" style="background: rgba(245, 158, 11, 0.12); border: 1px solid rgba(245, 158, 11, 0.35); color: #d97706;">
