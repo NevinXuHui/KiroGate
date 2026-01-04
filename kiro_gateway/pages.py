@@ -4804,10 +4804,9 @@ def render_user_page(user) -> str:
       }}
 
       guideTitle.textContent = '准备就绪';
-      guideText.textContent = '你已具备调用条件，可以开始测试或继续管理 Token。';
+      guideText.textContent = '你已具备调用条件，可以开始测试。';
       guideActions.innerHTML = `
         <a href="/playground" class="btn-primary text-sm px-3 py-1.5">去测试</a>
-        <button type="button" onclick="showTab('tokens'); showTokenSubTab('mine');" class="text-sm px-3 py-1.5 rounded-lg" style="background: var(--bg-input); border: 1px solid var(--border);">管理 Token</button>
         <a href="/docs" class="text-sm px-3 py-1.5 rounded-lg" style="background: var(--bg-input); border: 1px solid var(--border);">查看文档</a>
       `;
     }}
