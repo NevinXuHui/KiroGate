@@ -5514,12 +5514,13 @@ def render_user_page(user) -> str:
 
         // 显示完整的 API Key 在模态框中
         const modal = document.createElement('div');
+        modal.id = 'apiKeyRevealModal';
         modal.style.cssText = 'position: fixed; inset: 0; background: rgba(0,0,0,0.7); display: flex; align-items: center; justify-content: center; z-index: 9999;';
         modal.innerHTML = `
           <div class="card" style="max-width: 600px; width: 90%; padding: 24px;">
             <div class="flex items-center justify-between mb-4">
               <h3 class="text-xl font-bold">API Key</h3>
-              <button onclick="this.closest('[style*=\\'position: fixed\\']').remove()" class="text-2xl hover:opacity-70">&times;</button>
+              <button id="apiKeyRevealCloseBtn" class="w-8 h-8 flex items-center justify-center text-2xl rounded-lg hover:opacity-70" style="background: var(--bg-input);" title="关闭">&times;</button>
             </div>
             <div class="mb-4">
               <label class="block text-sm mb-2" style="color: var(--text-muted);">完整密钥（请妥善保管）</label>
@@ -5532,9 +5533,17 @@ def render_user_page(user) -> str:
             <div class="text-sm p-3 rounded-lg" style="background: var(--bg-hover); color: var(--text-muted);">
               <strong>⚠️ 安全提示：</strong>请勿将 API Key 分享给他人或提交到公开代码仓库。
             </div>
+            <div class="flex justify-end mt-4">
+              <button id="apiKeyRevealConfirmBtn" class="btn-primary">关闭</button>
+            </div>
           </div>
         `;
         document.body.appendChild(modal);
+        // 绑定关闭事件
+        const closeModal = () => modal.remove();
+        document.getElementById('apiKeyRevealCloseBtn').onclick = closeModal;
+        document.getElementById('apiKeyRevealConfirmBtn').onclick = closeModal;
+        modal.onclick = (e) => {{ if (e.target === modal) closeModal(); }};
       }} catch (e) {{
         showConfirmModal({{
           title: '获取失败',
