@@ -4338,13 +4338,14 @@ def render_user_page(user) -> str:
                   <th class="text-left py-3 px-3 cursor-pointer hover:text-indigo-400" onclick="sortTokens('id')">ID ↕</th>
                   <th class="text-left py-3 px-3 cursor-pointer hover:text-indigo-400" onclick="sortTokens('visibility')">可见性 ↕</th>
                   <th class="text-left py-3 px-3 cursor-pointer hover:text-indigo-400" onclick="sortTokens('status')">状态 ↕</th>
+                  <th class="text-left py-3 px-3">配额</th>
                   <th class="text-left py-3 px-3 cursor-pointer hover:text-indigo-400" onclick="sortTokens('success_rate')">成功率 ↕</th>
                   <th class="text-left py-3 px-3 cursor-pointer hover:text-indigo-400" onclick="sortTokens('last_used')">最后使用 ↕</th>
                   <th class="text-left py-3 px-3">操作</th>
                 </tr>
               </thead>
               <tbody id="tokenTable">
-                <tr><td colspan="7" class="py-6 text-center" style="color: var(--text-muted);">加载中...</td></tr>
+                <tr><td colspan="8" class="py-6 text-center" style="color: var(--text-muted);">加载中...</td></tr>
               </tbody>
             </table>
           </div>
@@ -4960,10 +4961,47 @@ def render_user_page(user) -> str:
       loadTokens();
     }}
 
+    function formatQuota(usageData) {{
+      if (!usageData) return '<span class="text-gray-400">-</span>';
+      try {{
+        const data = typeof usageData === 'string' ? JSON.parse(usageData) : usageData;
+        const list = data.usageBreakdownList || [];
+        if (!list.length) return '<span class="text-gray-400">-</span>';
+        const item = list[0];
+        const used = item.currentUsage || 0;
+        const limit = item.usageLimit || 0;
+        const pct = limit > 0 ? Math.round((used / limit) * 100) : 0;
+        const color = pct >= 90 ? 'text-red-400' : pct >= 70 ? 'text-amber-400' : 'text-green-400';
+        return `<span class="${{color}}">${{used}}/${{limit}}</span>`;
+      }} catch (e) {{
+        return '<span class="text-gray-400">-</span>';
+      }}
+    }}
+
+    async function refreshTokenUsage(tokenId, btn) {{
+      btn.disabled = true;
+      btn.textContent = '...';
+      try {{
+        const r = await fetch('/user/api/tokens/' + tokenId + '/refresh-usage', {{ method: 'POST' }});
+        const d = await r.json();
+        if (d.success) {{
+          loadTokens();
+        }} else {{
+          alert(d.message || '刷新失败');
+          btn.disabled = false;
+          btn.textContent = '刷新';
+        }}
+      }} catch (e) {{
+        alert('刷新失败');
+        btn.disabled = false;
+        btn.textContent = '刷新';
+      }}
+    }}
+
     function renderTokenTable(tokens) {{
       const tb = document.getElementById('tokenTable');
       if (!tokens || !tokens.length) {{
-        tb.innerHTML = '<tr><td colspan="7" class="py-8 text-center" style="color: var(--text-muted);"><div class="mb-3">还没有 Token，先添加一个吧</div><button type="button" onclick="showDonateModal()" class="btn-primary text-sm px-3 py-1.5">+ 添加 Token</button></td></tr>';
+        tb.innerHTML = '<tr><td colspan="8" class="py-8 text-center" style="color: var(--text-muted);"><div class="mb-3">还没有 Token，先添加一个吧</div><button type="button" onclick="showDonateModal()" class="btn-primary text-sm px-3 py-1.5">+ 添加 Token</button></td></tr>';
         document.getElementById('tokensPagination').style.display = 'none';
         document.getElementById('selectAllTokens').checked = false;
         return;
@@ -4983,6 +5021,10 @@ def render_user_page(user) -> str:
             <td class="py-3 px-3">#${{t.id}}</td>
             <td class="py-3 px-3"><span class="${{t.visibility === 'public' ? 'text-green-400' : 'text-blue-400'}}">${{t.visibility === 'public' ? '公开' : '私有'}}</span></td>
             <td class="py-3 px-3">${{renderTokenStatus(t.status)}}</td>
+            <td class="py-3 px-3">
+              ${{formatQuota(t.usage_data)}}
+              <button onclick="refreshTokenUsage(${{t.id}}, this)" class="text-xs px-1.5 py-0.5 rounded bg-cyan-500/20 text-cyan-400 ml-1">刷新</button>
+            </td>
             <td class="py-3 px-3">${{formatSuccessRate(t.success_rate)}}</td>
             <td class="py-3 px-3">${{t.last_used ? new Date(t.last_used).toLocaleString() : '-'}}</td>
             <td class="py-3 px-3">
