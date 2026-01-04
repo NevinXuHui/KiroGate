@@ -1926,10 +1926,11 @@ def render_dashboard_page() -> str:
               <th class="py-3 px-3">状态</th>
               <th class="py-3 px-3">耗时</th>
               <th class="py-3 px-3">模型</th>
+              <th class="py-3 px-3">客户端</th>
             </tr>
           </thead>
           <tbody id="recentRequestsTable">
-            <tr><td colspan="6" class="py-6 text-center" style="color:var(--text-muted)">加载中...</td></tr>
+            <tr><td colspan="7" class="py-6 text-center" style="color:var(--text-muted)">加载中...</td></tr>
           </tbody>
         </table>
       </div>
@@ -1987,6 +1988,24 @@ async function refreshData(){{
 
     const rq=(d.recentRequests||[]).slice(-10).reverse();
     const tb=document.getElementById('recentRequestsTable');
+    const formatClient=(ua)=>{{
+      if(!ua)return '-';
+      if(ua.includes('Claude-Code'))return 'Claude Code';
+      if(ua.includes('Cursor'))return 'Cursor';
+      if(ua.includes('VSCode')||ua.includes('vscode'))return 'VS Code';
+      if(ua.includes('Windsurf'))return 'Windsurf';
+      if(ua.includes('Cline'))return 'Cline';
+      if(ua.includes('Continue'))return 'Continue';
+      if(ua.includes('Aider'))return 'Aider';
+      if(ua.includes('OpenAI'))return 'OpenAI SDK';
+      if(ua.includes('anthropic'))return 'Anthropic SDK';
+      if(ua.includes('python-requests'))return 'Python';
+      if(ua.includes('axios'))return 'Axios';
+      if(ua.includes('node-fetch')||ua.includes('Node'))return 'Node.js';
+      if(ua.includes('curl'))return 'cURL';
+      if(ua.length>20)return ua.substring(0,20)+'...';
+      return ua||'-';
+    }};
     tb.innerHTML=rq.length?rq.map(q=>`
       <tr class="table-row">
         <td class="py-3 px-3">${{new Date(q.timestamp).toLocaleTimeString()}}</td>
@@ -1995,7 +2014,8 @@ async function refreshData(){{
         <td class="py-3 px-3 ${{q.status<400?'text-emerald-400':'text-red-400'}}">${{q.status}}</td>
         <td class="py-3 px-3">${{q.duration.toFixed(0)}}ms</td>
         <td class="py-3 px-3">${{q.model||'-'}}</td>
-      </tr>`).join(''):'<tr><td colspan="6" class="py-6 text-center" style="color:var(--text-muted)">暂无请求</td></tr>';
+        <td class="py-3 px-3 text-xs" title="${{q.client||''}}">${{formatClient(q.client)}}</td>
+      </tr>`).join(''):'<tr><td colspan="7" class="py-6 text-center" style="color:var(--text-muted)">暂无请求</td></tr>';
   }}catch(e){{console.error(e)}}
 }}
 

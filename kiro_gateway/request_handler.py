@@ -427,6 +427,7 @@ class RequestHandler:
         """
         start_time = time.time()
         api_type = "anthropic" if response_format == "anthropic" else "openai"
+        client = request.headers.get("User-Agent", "")
 
         # Use auth_manager from request.state if available (multi-tenant mode)
         # Otherwise fall back to global auth_manager
@@ -484,7 +485,8 @@ class RequestHandler:
                     duration_ms=duration_ms,
                     model=request_data.model,
                     is_stream=request_data.stream,
-                    api_type=api_type
+                    api_type=api_type,
+                    client=client
                 )
                 return await RequestHandler.handle_api_error(
                     response,
@@ -505,7 +507,8 @@ class RequestHandler:
                 duration_ms=duration_ms,
                 model=request_data.model,
                 is_stream=request_data.stream,
-                api_type=api_type
+                api_type=api_type,
+                client=client
             )
 
             # 根据请求类型和响应格式处理
@@ -570,7 +573,8 @@ class RequestHandler:
                 duration_ms=duration_ms,
                 model=request_data.model,
                 is_stream=request_data.stream,
-                api_type=api_type
+                api_type=api_type,
+                client=client
             )
             RequestHandler.log_error(endpoint_name, e.detail, e.status_code)
             if debug_logger:
@@ -585,7 +589,8 @@ class RequestHandler:
                 duration_ms=duration_ms,
                 model=request_data.model,
                 is_stream=request_data.stream,
-                api_type=api_type
+                api_type=api_type,
+                client=client
             )
             error_msg = str(e) if str(e) else f"{type(e).__name__}: {repr(e)}"
             logger.error(f"Internal error: {error_msg}", exc_info=True)
