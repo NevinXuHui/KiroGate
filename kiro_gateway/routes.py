@@ -2925,6 +2925,33 @@ async def user_reveal_key(
     return {"success": True, "key": plain_key}
 
 
+@router.get("/user/api/force-model", include_in_schema=False)
+async def user_get_force_model(request: Request):
+    """Get force model setting."""
+    user = get_current_user(request)
+    if not user:
+        return JSONResponse(status_code=401, content={"error": "未登录"})
+    from kiro_gateway.config import settings
+    return {"force_model": settings.force_model}
+
+
+@router.post("/user/api/force-model", include_in_schema=False)
+async def user_set_force_model(
+    request: Request,
+    model: str = Form("")
+):
+    """Update force model setting."""
+    user = get_current_user(request)
+    if not user:
+        return JSONResponse(status_code=401, content={"error": "未登录"})
+    from kiro_gateway.config import settings, AVAILABLE_MODELS
+    model = model.strip()
+    if model and model not in AVAILABLE_MODELS:
+        return JSONResponse(status_code=400, content={"error": f"无效的模型: {model}"})
+    settings.force_model = model
+    return {"success": True, "force_model": model}
+
+
 @router.get("/admin/api/import-keys/{key_id}/reveal", include_in_schema=False)
 async def admin_reveal_import_key(
     request: Request,
