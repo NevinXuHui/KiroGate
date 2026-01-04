@@ -384,3 +384,36 @@ class KiroAuthManager:
     def fingerprint(self) -> str:
         """Unique machine fingerprint."""
         return self._fingerprint
+
+    async def get_subscription_usage(self) -> Optional[dict]:
+        """
+        Get subscription usage data from Kiro Q API.
+
+        Returns:
+            Usage data dict containing usageBreakdownList, subscriptionInfo, etc.
+            Returns None on error.
+        """
+        try:
+            token = await self.get_access_token()
+            from kiro_gateway.utils import get_kiro_headers
+            headers = get_kiro_headers(self, token)
+
+            async with httpx.AsyncClient(timeout=30) as client:
+                response = await client.get(
+                    f"{self._q_host}/GetSubscriptionUsage",
+                    headers=headers,
+                    params={
+                        "origin": "AI_EDITOR",
+                        "profileArn": self._profile_arn or ""
+                    }
+                )
+
+                if response.status_code == 200:
+                    return response.json()
+                else:
+                    logger.warning(f"GetSubscriptionUsage failed: HTTP {response.status_code}")
+                    return None
+
+        except Exception as e:
+            logger.error(f"Error getting subscription usage: {e}")
+            return None

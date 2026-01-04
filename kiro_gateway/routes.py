@@ -2309,6 +2309,7 @@ async def user_get_tokens(
                 "success_rate": round(t.success_rate * 100, 1),
                 "last_used": t.last_used,
                 "created_at": t.created_at,
+                "usage_data": t.usage_data,
             }
             for t in tokens
         ],
@@ -2793,6 +2794,47 @@ async def user_delete_token(
     from kiro_gateway.database import user_db
     success = user_db.delete_token(token_id, user.id)
     return {"success": success}
+
+
+@router.post("/user/api/tokens/{token_id}/refresh-usage", include_in_schema=False)
+async def user_refresh_token_usage(
+    request: Request,
+    token_id: int,
+    _csrf: None = Depends(require_same_origin)
+):
+    """Refresh token usage data from Kiro API."""
+    import json as json_module
+    user = get_current_user(request)
+    if not user:
+        return JSONResponse(status_code=401, content={"error": "未登录"})
+
+    from kiro_gateway.database import user_db
+    from kiro_gateway.auth import KiroAuthManager
+    from kiro_gateway.config import settings as cfg
+
+    token = user_db.get_token_by_id(token_id)
+    if not token or token.user_id != user.id:
+        return JSONResponse(status_code=404, content={"error": "Token 不存在"})
+
+    refresh_token = user_db.get_decrypted_token(token_id)
+    if not refresh_token:
+        return JSONResponse(status_code=500, content={"error": "无法解密 Token"})
+
+    try:
+        temp_manager = KiroAuthManager(
+            refresh_token=refresh_token,
+            region=cfg.region,
+            profile_arn=cfg.profile_arn
+        )
+        usage_data = await temp_manager.get_subscription_usage()
+        if usage_data:
+            user_db.update_token_usage_data(token_id, json_module.dumps(usage_data))
+            return {"success": True, "usage_data": usage_data}
+        else:
+            return {"success": False, "message": "无法获取配额信息"}
+    except Exception as e:
+        logger.error(f"刷新 Token 配额失败: {e}")
+        return {"success": False, "message": f"刷新失败: {str(e)}"}
 
 
 @router.get("/user/api/keys", include_in_schema=False)

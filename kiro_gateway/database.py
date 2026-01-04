@@ -65,6 +65,7 @@ class DonatedToken:
     last_used: Optional[int]
     last_check: Optional[int]
     created_at: int
+    usage_data: Optional[str] = None  # JSON string of usage data
 
     @property
     def success_rate(self) -> float:
@@ -239,6 +240,11 @@ class UserDatabase:
             if "key_encrypted" not in import_keys_columns:
                 conn.execute(
                     "ALTER TABLE import_keys ADD COLUMN key_encrypted TEXT"
+                )
+            # Add usage_data column to tokens table if not exists
+            if "usage_data" not in columns:
+                conn.execute(
+                    "ALTER TABLE tokens ADD COLUMN usage_data TEXT"
                 )
             conn.commit()
         logger.info(f"User database initialized: {self._db_path}")
@@ -873,6 +879,16 @@ class UserDatabase:
                     (token_id, token_id)
                 )
 
+    def update_token_usage_data(self, token_id: int, usage_data: str) -> bool:
+        """Update token usage data (JSON string)."""
+        with self._lock:
+            with self._get_conn() as conn:
+                conn.execute(
+                    "UPDATE tokens SET usage_data = ? WHERE id = ?",
+                    (usage_data, token_id)
+                )
+                return True
+
     def get_token_count(self, user_id: Optional[int] = None) -> Dict[str, int]:
         """Get token counts."""
         with self._get_conn() as conn:
@@ -892,6 +908,9 @@ class UserDatabase:
 
     def _row_to_token(self, row: sqlite3.Row) -> DonatedToken:
         """Convert database row to DonatedToken object."""
+        usage_data = None
+        if hasattr(row, "keys") and "usage_data" in row.keys():
+            usage_data = row["usage_data"]
         return DonatedToken(
             id=row["id"],
             user_id=row["user_id"],
@@ -902,7 +921,8 @@ class UserDatabase:
             fail_count=row["fail_count"],
             last_used=row["last_used"],
             last_check=row["last_check"],
-            created_at=row["created_at"]
+            created_at=row["created_at"],
+            usage_data=usage_data
         )
 
     # ==================== API Key Methods ====================
