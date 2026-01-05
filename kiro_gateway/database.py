@@ -14,7 +14,7 @@ import time
 from contextlib import contextmanager
 from dataclasses import dataclass
 from threading import Lock
-from typing import Dict, List, Optional, Tuple
+from typing import Any, Dict, List, Optional, Tuple
 
 from cryptography.fernet import Fernet
 from loguru import logger
@@ -192,6 +192,23 @@ class UserDatabase:
                     FOREIGN KEY (token_id) REFERENCES tokens(id) ON DELETE CASCADE
                 );
                 CREATE INDEX IF NOT EXISTS idx_health_token ON token_health(token_id);
+
+                -- Token usage statistics (prompt/completion tokens)
+                CREATE TABLE IF NOT EXISTS token_usage_stats (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    user_id INTEGER NOT NULL,
+                    api_key_id INTEGER,
+                    donated_token_id INTEGER,
+                    model TEXT NOT NULL,
+                    prompt_tokens INTEGER NOT NULL DEFAULT 0,
+                    completion_tokens INTEGER NOT NULL DEFAULT 0,
+                    total_tokens INTEGER NOT NULL DEFAULT 0,
+                    created_at INTEGER NOT NULL,
+                    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+                );
+                CREATE INDEX IF NOT EXISTS idx_usage_stats_user ON token_usage_stats(user_id);
+                CREATE INDEX IF NOT EXISTS idx_usage_stats_created ON token_usage_stats(created_at);
+                CREATE INDEX IF NOT EXISTS idx_usage_stats_model ON token_usage_stats(model);
 
                 -- Site announcements
                 CREATE TABLE IF NOT EXISTS announcements (
@@ -789,6 +806,17 @@ class UserDatabase:
             ).fetchall()
             return [self._row_to_token(r) for r in rows]
 
+    def get_tokens_by_status(self, status: str) -> List[DonatedToken]:
+        """Get all tokens with given status."""
+        if status not in ("active", "invalid", "expired"):
+            return []
+        with self._get_conn() as conn:
+            rows = conn.execute(
+                "SELECT * FROM tokens WHERE status = ?",
+                (status,)
+            ).fetchall()
+            return [self._row_to_token(r) for r in rows]
+
     def get_token_by_id(self, token_id: int) -> Optional[DonatedToken]:
         """Get token by ID."""
         with self._get_conn() as conn:
@@ -888,6 +916,125 @@ class UserDatabase:
                     (usage_data, token_id)
                 )
                 return True
+
+    # ==================== Token Usage Stats Methods ====================
+
+    def record_token_usage_stats(
+        self,
+        user_id: int,
+        model: str,
+        prompt_tokens: int,
+        completion_tokens: int,
+        total_tokens: int,
+        api_key_id: Optional[int] = None,
+        donated_token_id: Optional[int] = None
+    ) -> None:
+        """Record token usage statistics for a request."""
+        now = int(time.time() * 1000)
+        with self._lock:
+            with self._get_conn() as conn:
+                conn.execute(
+                    """INSERT INTO token_usage_stats 
+                       (user_id, api_key_id, donated_token_id, model, prompt_tokens, completion_tokens, total_tokens, created_at)
+                       VALUES (?, ?, ?, ?, ?, ?, ?, ?)""",
+                    (user_id, api_key_id, donated_token_id, model, prompt_tokens, completion_tokens, total_tokens, now)
+                )
+
+    def get_user_usage_stats(
+        self,
+        user_id: int,
+        start_time: Optional[int] = None,
+        end_time: Optional[int] = None
+    ) -> Dict[str, Any]:
+        """Get aggregated usage statistics for a user."""
+        with self._get_conn() as conn:
+            where = ["user_id = ?"]
+            params: List[Any] = [user_id]
+            
+            if start_time:
+                where.append("created_at >= ?")
+                params.append(start_time)
+            if end_time:
+                where.append("created_at <= ?")
+                params.append(end_time)
+            
+            where_clause = " AND ".join(where)
+            
+            # Total stats
+            row = conn.execute(
+                f"""SELECT 
+                    COUNT(*) as request_count,
+                    COALESCE(SUM(prompt_tokens), 0) as total_prompt_tokens,
+                    COALESCE(SUM(completion_tokens), 0) as total_completion_tokens,
+                    COALESCE(SUM(total_tokens), 0) as total_tokens
+                FROM token_usage_stats WHERE {where_clause}""",
+                params
+            ).fetchone()
+            
+            # Per model stats
+            model_rows = conn.execute(
+                f"""SELECT 
+                    model,
+                    COUNT(*) as request_count,
+                    COALESCE(SUM(prompt_tokens), 0) as prompt_tokens,
+                    COALESCE(SUM(completion_tokens), 0) as completion_tokens,
+                    COALESCE(SUM(total_tokens), 0) as total_tokens
+                FROM token_usage_stats WHERE {where_clause}
+                GROUP BY model ORDER BY total_tokens DESC""",
+                params
+            ).fetchall()
+            
+            return {
+                "request_count": row["request_count"],
+                "total_prompt_tokens": row["total_prompt_tokens"],
+                "total_completion_tokens": row["total_completion_tokens"],
+                "total_tokens": row["total_tokens"],
+                "by_model": [
+                    {
+                        "model": r["model"],
+                        "request_count": r["request_count"],
+                        "prompt_tokens": r["prompt_tokens"],
+                        "completion_tokens": r["completion_tokens"],
+                        "total_tokens": r["total_tokens"]
+                    }
+                    for r in model_rows
+                ]
+            }
+
+    def get_user_usage_history(
+        self,
+        user_id: int,
+        days: int = 7
+    ) -> List[Dict[str, Any]]:
+        """Get daily usage history for a user."""
+        now = int(time.time() * 1000)
+        start_time = now - (days * 24 * 60 * 60 * 1000)
+        
+        with self._get_conn() as conn:
+            rows = conn.execute(
+                """SELECT 
+                    DATE(created_at / 1000, 'unixepoch') as date,
+                    COUNT(*) as request_count,
+                    COALESCE(SUM(prompt_tokens), 0) as prompt_tokens,
+                    COALESCE(SUM(completion_tokens), 0) as completion_tokens,
+                    COALESCE(SUM(total_tokens), 0) as total_tokens
+                FROM token_usage_stats 
+                WHERE user_id = ? AND created_at >= ?
+                GROUP BY DATE(created_at / 1000, 'unixepoch')
+                ORDER BY date DESC""",
+                (user_id, start_time)
+            ).fetchall()
+            
+            return [
+                {
+                    "date": r["date"],
+                    "request_count": r["request_count"],
+                    "prompt_tokens": r["prompt_tokens"],
+                    "completion_tokens": r["completion_tokens"],
+                    "total_tokens": r["total_tokens"]
+                }
+                for r in rows
+            ]
 
     def get_token_count(self, user_id: Optional[int] = None) -> Dict[str, int]:
         """Get token counts."""

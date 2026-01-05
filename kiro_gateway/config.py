@@ -294,6 +294,9 @@ class Settings(BaseSettings):
     # Token 最低成功率阈值
     token_min_success_rate: float = Field(default=0.7, alias="TOKEN_MIN_SUCCESS_RATE")
 
+    # Token 分配策略: round_robin(轮询), sequential(用完一个再用下一个), score_based(评分优先，默认)
+    token_allocation_strategy: str = Field(default="score_based", alias="TOKEN_ALLOCATION_STRATEGY")
+
     # 静态资源代理配置
     static_assets_proxy_enabled: bool = Field(default=True, alias="STATIC_ASSETS_PROXY_ENABLED")
     static_assets_proxy_base: str = Field(default="https://proxy.jhun.edu.kg", alias="STATIC_ASSETS_PROXY_BASE")

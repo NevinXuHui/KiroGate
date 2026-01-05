@@ -1958,6 +1958,82 @@ async def admin_delete_donated_token(
     return {"success": success}
 
 
+@router.post("/admin/api/donated-tokens/revalidate", include_in_schema=False)
+async def admin_revalidate_token(
+    request: Request,
+    token_id: int = Form(...),
+    _csrf: None = Depends(require_same_origin)
+):
+    """Revalidate a token and update its status."""
+    session = request.cookies.get("admin_session")
+    if not verify_admin_session(session):
+        return JSONResponse(status_code=401, content={"error": "未授权"})
+
+    from kiro_gateway.health_checker import health_checker
+    from kiro_gateway.database import user_db
+
+    token = user_db.get_token_by_id(token_id)
+    if not token:
+        return JSONResponse(status_code=404, content={"error": "Token 不存在"})
+
+    try:
+        is_valid = await health_checker.check_token(token_id)
+        if is_valid:
+            user_db.set_token_status(token_id, "active")
+            return {"success": True, "status": "active", "message": "Token 验证通过，已恢复为有效状态"}
+        else:
+            user_db.set_token_status(token_id, "invalid")
+            return {"success": True, "status": "invalid", "message": "Token 验证失败，状态保持无效"}
+    except Exception as e:
+        logger.error(f"Token revalidation failed: {e}")
+        return JSONResponse(status_code=500, content={"error": f"验证失败: {str(e)}"})
+
+
+@router.post("/admin/api/donated-tokens/batch-revalidate", include_in_schema=False)
+async def admin_batch_revalidate_tokens(
+    request: Request,
+    token_ids: str = Form(...),
+    _csrf: None = Depends(require_same_origin)
+):
+    """Batch revalidate multiple tokens."""
+    session = request.cookies.get("admin_session")
+    if not verify_admin_session(session):
+        return JSONResponse(status_code=401, content={"error": "未授权"})
+
+    from kiro_gateway.health_checker import health_checker
+    from kiro_gateway.database import user_db
+
+    try:
+        ids = [int(x.strip()) for x in token_ids.split(",") if x.strip()]
+    except ValueError:
+        return JSONResponse(status_code=400, content={"error": "Token ID 格式无效"})
+
+    results = {"valid": 0, "invalid": 0, "not_found": 0, "errors": 0}
+
+    for tid in ids:
+        token = user_db.get_token_by_id(tid)
+        if not token:
+            results["not_found"] += 1
+            continue
+        try:
+            is_valid = await health_checker.check_token(tid)
+            if is_valid:
+                user_db.set_token_status(tid, "active")
+                results["valid"] += 1
+            else:
+                user_db.set_token_status(tid, "invalid")
+                results["invalid"] += 1
+        except Exception as e:
+            logger.error(f"Batch revalidation failed for token {tid}: {e}")
+            results["errors"] += 1
+
+    return {
+        "success": True,
+        "results": results,
+        "message": f"验证完成: {results['valid']} 有效, {results['invalid']} 无效, {results['not_found']} 不存在, {results['errors']} 错误"
+    }
+
+
 @router.get("/admin/api/announcement", include_in_schema=False)
 async def admin_get_announcement(request: Request):
     """Get latest announcement for admin."""
@@ -2844,6 +2920,63 @@ async def user_refresh_token_usage(
         return {"success": False, "message": f"刷新失败: {str(e)}"}
 
 
+@router.post("/user/api/tokens/{token_id}/revalidate", include_in_schema=False)
+async def user_revalidate_token(
+    request: Request,
+    token_id: int,
+    _csrf: None = Depends(require_same_origin)
+):
+    """Revalidate a token and update its status."""
+    user = get_current_user(request)
+    if not user:
+        return JSONResponse(status_code=401, content={"error": "未登录"})
+
+    from kiro_gateway.database import user_db
+    from kiro_gateway.health_checker import health_checker
+
+    token = user_db.get_token_by_id(token_id)
+    if not token or token.user_id != user.id:
+        return JSONResponse(status_code=404, content={"error": "Token 不存在"})
+
+    try:
+        is_valid = await health_checker.check_token(token_id)
+        if is_valid:
+            user_db.set_token_status(token_id, "active")
+            return {"success": True, "status": "active", "message": "Token 验证通过，已恢复为有效状态"}
+        else:
+            user_db.set_token_status(token_id, "invalid")
+            return {"success": True, "status": "invalid", "message": "Token 验证失败，状态保持无效"}
+    except Exception as e:
+        logger.error(f"Token revalidation failed: {e}")
+        return JSONResponse(status_code=500, content={"error": f"验证失败: {str(e)}"})
+
+
+@router.get("/user/api/usage-stats", include_in_schema=False)
+async def user_get_usage_stats(
+    request: Request,
+    days: int = Query(30, ge=1, le=365)
+):
+    """Get user's token usage statistics."""
+    user = get_current_user(request)
+    if not user:
+        return JSONResponse(status_code=401, content={"error": "未登录"})
+
+    from kiro_gateway.database import user_db
+    import time
+
+    now = int(time.time() * 1000)
+    start_time = now - (days * 24 * 60 * 60 * 1000)
+
+    stats = user_db.get_user_usage_stats(user.id, start_time=start_time)
+    history = user_db.get_user_usage_history(user.id, days=days)
+
+    return {
+        "stats": stats,
+        "history": history,
+        "period_days": days
+    }
+
+
 @router.get("/user/api/keys", include_in_schema=False)
 async def user_get_keys(
     request: Request,
@@ -2999,6 +3132,34 @@ async def user_set_force_model(
         return JSONResponse(status_code=400, content={"error": f"无效的模型: {model}"})
     settings.force_model = model
     return {"success": True, "force_model": model}
+
+
+@router.get("/user/api/token-strategy", include_in_schema=False)
+async def user_get_token_strategy(request: Request):
+    """Get token allocation strategy setting."""
+    user = get_current_user(request)
+    if not user:
+        return JSONResponse(status_code=401, content={"error": "未登录"})
+    from kiro_gateway.config import settings
+    return {"token_strategy": settings.token_allocation_strategy}
+
+
+@router.post("/user/api/token-strategy", include_in_schema=False)
+async def user_set_token_strategy(
+    request: Request,
+    strategy: str = Form("score_based")
+):
+    """Update token allocation strategy setting."""
+    user = get_current_user(request)
+    if not user:
+        return JSONResponse(status_code=401, content={"error": "未登录"})
+    from kiro_gateway.config import settings
+    valid_strategies = {"score_based", "round_robin", "sequential"}
+    strategy = strategy.strip()
+    if strategy not in valid_strategies:
+        return JSONResponse(status_code=400, content={"error": f"无效的策略: {strategy}"})
+    settings.token_allocation_strategy = strategy
+    return {"success": True, "token_strategy": strategy}
 
 
 @router.get("/admin/api/import-keys/{key_id}/reveal", include_in_schema=False)

@@ -269,6 +269,7 @@ class RequestHandler:
         endpoint_name: str,
         messages_for_tokenizer: Optional[List] = None,
         tools_for_tokenizer: Optional[List] = None,
+        request: Optional[Request] = None,
         **kwargs
     ) -> StreamingResponse:
         """
@@ -284,6 +285,7 @@ class RequestHandler:
             endpoint_name: 端点名称
             messages_for_tokenizer: 消息数据（用于 token 计数）
             tools_for_tokenizer: 工具数据（用于 token 计数）
+            request: FastAPI Request 对象（用于获取用户信息）
             **kwargs: 其他参数
 
         Returns:
@@ -291,6 +293,7 @@ class RequestHandler:
         """
         async def stream_wrapper():
             streaming_error = None
+            usage_info = {}  # 使用字典累积 usage 信息
             try:
                 async for chunk in stream_func(
                     http_client.client,
@@ -302,6 +305,31 @@ class RequestHandler:
                     request_tools=tools_for_tokenizer,
                     **kwargs
                 ):
+                    # 尝试从 chunk 中提取 usage 信息
+                    # 支持 OpenAI 格式 (data: {...}) 和 Anthropic 格式 (event: ...\ndata: {...})
+                    if '"usage"' in chunk:
+                        try:
+                            import json
+                            # 提取 data: 后面的 JSON
+                            if 'data: ' in chunk:
+                                data_start = chunk.find('data: ') + 6
+                                data_end = chunk.find('\n', data_start)
+                                if data_end == -1:
+                                    data_str = chunk[data_start:].strip()
+                                else:
+                                    data_str = chunk[data_start:data_end].strip()
+                                if data_str and data_str != "[DONE]":
+                                    data = json.loads(data_str)
+                                    # OpenAI 格式: usage 在顶层
+                                    if "usage" in data:
+                                        usage_info.update(data["usage"])
+                                    # Anthropic message_start 格式: usage 在 message.usage 中
+                                    if "message" in data and "usage" in data.get("message", {}):
+                                        usage_info.update(data["message"]["usage"])
+                                    if usage_info:
+                                        logger.info(f"[Usage] Updated usage_info from stream: {usage_info}")
+                        except Exception as e:
+                            logger.debug(f"[Usage] Failed to parse usage from chunk: {e}")
                     yield chunk
             except Exception as e:
                 streaming_error = e
@@ -312,6 +340,31 @@ class RequestHandler:
                     RequestHandler.handle_streaming_error(streaming_error, endpoint_name)
                 else:
                     RequestHandler.log_success(endpoint_name, is_streaming=True)
+                    # 记录 token 使用统计
+                    logger.info(f"[Usage] Stream finished. usage_info={usage_info}, request={request is not None}")
+                    if request and usage_info:
+                        try:
+                            user_id = getattr(request.state, 'user_id', None)
+                            api_key_id = getattr(request.state, 'api_key_id', None)
+                            donated_token_id = getattr(request.state, 'donated_token_id', None)
+                            logger.info(f"[Usage] Recording stats: user_id={user_id}, api_key_id={api_key_id}")
+                            if user_id:
+                                from kiro_gateway.database import user_db
+                                # 支持 OpenAI 格式 (prompt_tokens) 和 Anthropic 格式 (input_tokens)
+                                prompt_tokens = usage_info.get("prompt_tokens") or usage_info.get("input_tokens") or 0
+                                completion_tokens = usage_info.get("completion_tokens") or usage_info.get("output_tokens") or 0
+                                total_tokens = usage_info.get("total_tokens") or (prompt_tokens + completion_tokens)
+                                user_db.record_token_usage_stats(
+                                    user_id=user_id,
+                                    model=model,
+                                    prompt_tokens=prompt_tokens,
+                                    completion_tokens=completion_tokens,
+                                    total_tokens=total_tokens,
+                                    api_key_id=api_key_id,
+                                    donated_token_id=donated_token_id
+                                )
+                        except Exception as e:
+                            logger.debug(f"Failed to record token usage stats: {e}")
                 if debug_logger:
                     if streaming_error:
                         error_msg = RequestHandler.handle_streaming_error(streaming_error, endpoint_name)
@@ -365,6 +418,7 @@ class RequestHandler:
         endpoint_name: str,
         messages_for_tokenizer: Optional[List] = None,
         tools_for_tokenizer: Optional[List] = None,
+        request: Optional[Request] = None,
         **kwargs
     ) -> JSONResponse:
         """
@@ -380,6 +434,7 @@ class RequestHandler:
             endpoint_name: 端点名称
             messages_for_tokenizer: 消息数据（用于 token 计数）
             tools_for_tokenizer: 工具数据（用于 token 计数）
+            request: FastAPI Request 对象（用于获取用户信息）
             **kwargs: 其他参数
 
         Returns:
@@ -398,6 +453,32 @@ class RequestHandler:
 
         await http_client.close()
         RequestHandler.log_success(endpoint_name, is_streaming=False)
+
+        # 记录 token 使用统计
+        if request and collected_response:
+            try:
+                usage_info = collected_response.get("usage")
+                if usage_info:
+                    user_id = getattr(request.state, 'user_id', None)
+                    api_key_id = getattr(request.state, 'api_key_id', None)
+                    donated_token_id = getattr(request.state, 'donated_token_id', None)
+                    if user_id:
+                        from kiro_gateway.database import user_db
+                        # 支持 OpenAI 格式 (prompt_tokens) 和 Anthropic 格式 (input_tokens)
+                        prompt_tokens = usage_info.get("prompt_tokens") or usage_info.get("input_tokens") or 0
+                        completion_tokens = usage_info.get("completion_tokens") or usage_info.get("output_tokens") or 0
+                        total_tokens = usage_info.get("total_tokens") or (prompt_tokens + completion_tokens)
+                        user_db.record_token_usage_stats(
+                            user_id=user_id,
+                            model=model,
+                            prompt_tokens=prompt_tokens,
+                            completion_tokens=completion_tokens,
+                            total_tokens=total_tokens,
+                            api_key_id=api_key_id,
+                            donated_token_id=donated_token_id
+                        )
+            except Exception as e:
+                logger.debug(f"Failed to record token usage stats: {e}")
 
         if debug_logger:
             debug_logger.discard_buffers()
@@ -530,6 +611,7 @@ class RequestHandler:
                         endpoint_name,
                         messages_for_tokenizer,
                         tools_for_tokenizer,
+                        request=request,
                         thinking_enabled=getattr(request_data, 'thinking', None) is not None
                     )
                 else:
@@ -542,7 +624,8 @@ class RequestHandler:
                         stream_kiro_to_openai,
                         endpoint_name,
                         messages_for_tokenizer,
-                        tools_for_tokenizer
+                        tools_for_tokenizer,
+                        request=request
                     )
             else:
                 if response_format == "anthropic":
@@ -555,7 +638,8 @@ class RequestHandler:
                         collect_anthropic_response,
                         endpoint_name,
                         messages_for_tokenizer,
-                        tools_for_tokenizer
+                        tools_for_tokenizer,
+                        request=request
                     )
                 else:
                     return await RequestHandler.create_non_stream_response(
@@ -567,7 +651,8 @@ class RequestHandler:
                         collect_stream_response,
                         endpoint_name,
                         messages_for_tokenizer,
-                        tools_for_tokenizer
+                        tools_for_tokenizer,
+                        request=request
                     )
 
         except HTTPException as e:

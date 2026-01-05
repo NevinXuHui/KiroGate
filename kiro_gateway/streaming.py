@@ -94,7 +94,8 @@ def _calculate_usage_tokens(
     model_cache: "ModelInfoCache",
     model: str,
     request_messages: Optional[list],
-    request_tools: Optional[list]
+    request_tools: Optional[list],
+    tool_calls: Optional[List[Dict[str, Any]]] = None
 ) -> Dict[str, Any]:
     """
     Calculate token usage from response.
@@ -106,11 +107,23 @@ def _calculate_usage_tokens(
         model: Model name
         request_messages: Request messages for fallback counting
         request_tools: Request tools for fallback counting
+        tool_calls: Tool calls in response (for completion token counting)
 
     Returns:
         Dict with prompt_tokens, completion_tokens, total_tokens and source info
     """
+    # 计算文本内容的 tokens
     completion_tokens = count_tokens(full_content)
+    
+    # 计算 tool calls 的 tokens（包括函数名和参数）
+    if tool_calls:
+        for tc in tool_calls:
+            func = tc.get("function") or {}
+            tool_name = func.get("name") or ""
+            tool_args = func.get("arguments") or "{}"
+            # 计算函数名和参数的 tokens
+            completion_tokens += count_tokens(tool_name)
+            completion_tokens += count_tokens(tool_args)
 
     total_tokens_from_api = 0
     if context_usage_percentage is not None and context_usage_percentage > 0:
@@ -376,7 +389,7 @@ async def stream_kiro_to_openai_internal(
         # Calculate usage tokens using helper function
         usage_info = _calculate_usage_tokens(
             full_content, context_usage_percentage, model_cache, model,
-            request_messages, request_tools
+            request_messages, request_tools, tool_calls=all_tool_calls
         )
 
         # Send tool calls if any
@@ -920,7 +933,7 @@ async def stream_kiro_to_anthropic(
         # 使用统一的 token 计算函数（消除重复代码）
         usage_info = _calculate_usage_tokens(
             full_content, context_usage_percentage, model_cache, model,
-            request_messages, request_tools
+            request_messages, request_tools, tool_calls=all_tool_calls
         )
         input_tokens = usage_info["prompt_tokens"]
         completion_tokens = usage_info["completion_tokens"]
@@ -1082,7 +1095,7 @@ async def collect_anthropic_response(
     # 使用统一的 token 计算函数（消除重复代码）
     usage_info = _calculate_usage_tokens(
         full_content, context_usage_percentage, model_cache, model,
-        request_messages, request_tools
+        request_messages, request_tools, tool_calls=all_tool_calls
     )
     input_tokens = usage_info["prompt_tokens"]
     completion_tokens = usage_info["completion_tokens"]

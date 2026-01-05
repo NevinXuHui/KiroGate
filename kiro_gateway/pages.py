@@ -1039,6 +1039,80 @@ def render_docs_page() -> str:
     <div class="space-y-8">
       <section class="card">
         <div class="flex items-center gap-3 mb-6">
+          <div class="w-10 h-10 rounded-lg flex items-center justify-center text-xl" style="background: linear-gradient(135deg, var(--primary), var(--accent));">🏭</div>
+          <h2 class="text-2xl font-semibold">Factory 配置</h2>
+        </div>
+        <p style="color: var(--text-muted);" class="mb-4">将以下配置保存到 <code class="px-1.5 py-0.5 rounded" style="background: var(--bg-input);">~/factory/config.json</code> 文件中：</p>
+        <pre class="p-4 rounded-lg overflow-x-auto text-sm">{{
+  "custom_models": [
+    {{
+      "model_display_name": "Opus 4.5 [duojie.games]",
+      "model": "claude-opus-4-5-20251101",
+      "base_url": "https://api.duojie.games",
+      "api_key": "sk-BEM06N3GwI1zjmiGzel9UUKjpWfDXMHRB57OIBJIXXPV95qY",
+      "provider": "anthropic",
+      "supports_vision": true,
+      "max_tokens": 8192
+    }},
+    {{
+      "model_display_name": "kiro opus 4.5",
+      "model": "claude-opus-4-5-think",
+      "base_url": "http://hh:8000",
+      "api_key": "sk-3117eba9028e3455ecaa90a3463769adddb965f39d53d72a",
+      "provider": "anthropic",
+      "supports_vision": true,
+      "max_tokens": 8192
+    }}
+  ]
+}}</pre>
+        <div class="mt-4 p-4 rounded-xl" style="background: linear-gradient(135deg, rgba(99, 102, 241, 0.1), rgba(139, 92, 246, 0.1)); border: 1px solid rgba(99, 102, 241, 0.2);">
+          <p class="text-sm font-semibold mb-2" style="color: var(--text);">💡 配置说明</p>
+          <ul class="text-sm space-y-1.5" style="color: var(--text-muted);">
+            <li>• <strong>model_display_name</strong>：在 UI 中显示的模型名称</li>
+            <li>• <strong>model</strong>：实际调用的模型 ID</li>
+            <li>• <strong>base_url</strong>：API 服务地址</li>
+            <li>• <strong>api_key</strong>：API 密钥</li>
+            <li>• <strong>provider</strong>：提供商类型 (anthropic/openai)</li>
+            <li>• <strong>supports_vision</strong>：是否支持视觉功能</li>
+            <li>• <strong>max_tokens</strong>：最大输出 token 数</li>
+          </ul>
+        </div>
+
+        <div class="mt-6 space-y-4">
+          <h3 class="text-lg font-medium flex items-center gap-2">
+            <span class="w-6 h-6 rounded bg-purple-500/20 text-purple-400 flex items-center justify-center text-xs">🤖</span>
+            Claude Code 配置
+          </h3>
+          <p class="text-sm" style="color: var(--text-muted);">在终端中设置环境变量：</p>
+          <pre class="p-4 rounded-lg overflow-x-auto text-sm">
+# 设置 API 提供商为 Anthropic
+export ANTHROPIC_BASE_URL="http://hh:8000"
+export ANTHROPIC_API_KEY="sk-3117eba9028e3455ecaa90a3463769adddb965f39d53d72a"
+
+# 或者添加到 ~/.bashrc 或 ~/.zshrc 永久生效
+echo 'export ANTHROPIC_BASE_URL="http://hh:8000"' >> ~/.bashrc
+echo 'export ANTHROPIC_API_KEY="sk-3117eba9028e3455ecaa90a3463769adddb965f39d53d72a"' >> ~/.bashrc</pre>
+        </div>
+
+        <div class="mt-6 space-y-4">
+          <h3 class="text-lg font-medium flex items-center gap-2">
+            <span class="w-6 h-6 rounded bg-green-500/20 text-green-400 flex items-center justify-center text-xs">🔗</span>
+            OpenAI SDK 配置
+          </h3>
+          <p class="text-sm" style="color: var(--text-muted);">在终端中设置环境变量：</p>
+          <pre class="p-4 rounded-lg overflow-x-auto text-sm">
+# 设置 OpenAI 兼容端点
+export OPENAI_BASE_URL="http://hh:8000/v1"
+export OPENAI_API_KEY="sk-3117eba9028e3455ecaa90a3463769adddb965f39d53d72a"
+
+# 或者添加到 ~/.bashrc 或 ~/.zshrc 永久生效
+echo 'export OPENAI_BASE_URL="http://hh:8000/v1"' >> ~/.bashrc
+echo 'export OPENAI_API_KEY="sk-3117eba9028e3455ecaa90a3463769adddb965f39d53d72a"' >> ~/.bashrc</pre>
+        </div>
+      </section>
+
+      <section class="card">
+        <div class="flex items-center gap-3 mb-6">
           <div class="w-10 h-10 rounded-lg flex items-center justify-center text-xl" style="background: linear-gradient(135deg, var(--primary), var(--accent));">🔑</div>
           <h2 class="text-2xl font-semibold">认证方式</h2>
         </div>
@@ -2474,6 +2548,7 @@ def render_admin_page() -> str:
               <option value="20" selected>20/页</option>
               <option value="50">50/页</option>
             </select>
+            <button onclick="batchRevalidateTokens()" class="btn btn-success text-sm">批量验证</button>
             <button onclick="batchDeletePoolTokens()" class="btn btn-danger text-sm">批量删除</button>
             <button onclick="refreshDonatedTokens()" class="btn btn-primary text-sm">刷新</button>
           </div>
@@ -3122,11 +3197,7 @@ def render_admin_page() -> str:
     }}
 
     function updateTokenChips() {{
-      const visibility = document.getElementById('tokenVisibilityFilter')?.value ?? '';
       const status = document.getElementById('tokenStatusFilter')?.value ?? '';
-      document.querySelectorAll('.filter-chip[data-group="visibility"]').forEach(chip => {{
-        chip.classList.toggle('active', chip.dataset.value === visibility);
-      }});
       document.querySelectorAll('.filter-chip[data-group="status"]').forEach(chip => {{
         chip.classList.toggle('active', chip.dataset.value === status);
       }});
@@ -4075,6 +4146,7 @@ def render_admin_page() -> str:
           <td class="py-3 px-3">${{t.use_count}}</td>
           <td class="py-3 px-3">${{t.last_used ? new Date(t.last_used).toLocaleString() : '-'}}</td>
           <td class="py-3 px-3">
+            <button onclick="revalidateToken(${{t.id}}, this)" class="text-xs px-2 py-1 rounded bg-cyan-500/20 text-cyan-400 hover:bg-cyan-500/30 mr-1">验证</button>
             <button onclick="toggleTokenVisibility(${{t.id}}, '${{t.visibility === 'public' ? 'private' : 'public'}}')" class="text-xs px-2 py-1 rounded bg-indigo-500/20 text-indigo-400 hover:bg-indigo-500/30 mr-1">切换</button>
             <button onclick="deleteDonatedToken(${{t.id}})" class="text-xs px-2 py-1 rounded bg-red-500/20 text-red-400 hover:bg-red-500/30">删除</button>
           </td>
@@ -4127,6 +4199,52 @@ def render_admin_page() -> str:
       fd.append('token_id', tokenId);
       await fetch('/admin/api/donated-tokens/delete', {{ method: 'POST', body: fd }});
       refreshDonatedTokens();
+    }}
+
+    async function revalidateToken(tokenId, btn) {{
+      const originalText = btn.textContent;
+      btn.textContent = '验证中...';
+      btn.disabled = true;
+      try {{
+        const fd = new FormData();
+        fd.append('token_id', tokenId);
+        const r = await fetch('/admin/api/donated-tokens/revalidate', {{ method: 'POST', body: fd }});
+        const d = await r.json();
+        if (d.success) {{
+          alert(d.message);
+          refreshDonatedTokens();
+        }} else {{
+          alert(d.error || '验证失败');
+        }}
+      }} catch (e) {{
+        alert('验证请求失败');
+      }} finally {{
+        btn.textContent = originalText;
+        btn.disabled = false;
+      }}
+    }}
+
+    async function batchRevalidateTokens() {{
+      if (selectedPoolTokens.size === 0) {{
+        alert('请先选择要验证的 Token');
+        return;
+      }}
+      if (!confirm(`确定要重新验证选中的 ${{selectedPoolTokens.size}} 个 Token 吗？`)) return;
+      const fd = new FormData();
+      fd.append('token_ids', Array.from(selectedPoolTokens).join(','));
+      try {{
+        const r = await fetch('/admin/api/donated-tokens/batch-revalidate', {{ method: 'POST', body: fd }});
+        const d = await r.json();
+        if (d.success) {{
+          alert(d.message);
+          selectedPoolTokens.clear();
+          refreshDonatedTokens();
+        }} else {{
+          alert(d.error || '批量验证失败');
+        }}
+      }} catch (e) {{
+        alert('批量验证请求失败');
+      }}
     }}
 
     refreshStats();
@@ -4218,14 +4336,10 @@ def render_user_page(user) -> str:
         </div>
       </div>
     </div>
-    <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
+    <div class="grid grid-cols-3 gap-4 mb-6">
       <div class="card text-center">
         <div class="text-3xl font-bold text-indigo-400" id="tokenCount">-</div>
         <div class="text-sm" style="color: var(--text-muted);">我的 Token</div>
-      </div>
-      <div class="card text-center public-only">
-        <div class="text-3xl font-bold text-green-400" id="publicTokenCount">-</div>
-        <div class="text-sm" style="color: var(--text-muted);">公开 Token</div>
       </div>
       <div class="card text-center">
         <div class="text-3xl font-bold text-amber-400" id="apiKeyCount">-</div>
@@ -4262,6 +4376,7 @@ def render_user_page(user) -> str:
     <div class="flex gap-2 mb-4 border-b" style="border-color: var(--border);">
       <button class="tab px-4 py-2 font-medium" onclick="showTab('tokens')" id="tab-tokens">🔑 Token 管理</button>
       <button class="tab px-4 py-2 font-medium" onclick="showTab('keys')" id="tab-keys">🗝️ API Keys</button>
+      <button class="tab px-4 py-2 font-medium" onclick="showTab('usage')" id="tab-usage">📊 使用统计</button>
       <button class="tab px-4 py-2 font-medium" onclick="showTab('settings')" id="tab-settings">⚙️ 设置</button>
     </div>
     <div id="panel-tokens" class="tab-panel">
@@ -4284,10 +4399,9 @@ def render_user_page(user) -> str:
           </div>
         </details>
 
-        <!-- 子标签切换：我的 Token / 公开 Token -->
+        <!-- Token 管理标题 -->
         <div class="flex gap-1 mb-4 p-1 rounded-lg" style="background: var(--bg-input);">
-          <button onclick="showTokenSubTab('mine')" id="subtab-mine" class="subtab flex-1 px-4 py-2 rounded-md text-sm font-medium transition-all">🔐 我的 Token</button>
-          <button onclick="showTokenSubTab('public')" id="subtab-public" class="subtab flex-1 px-4 py-2 rounded-md text-sm font-medium transition-all public-only">🌐 公开 Token 池</button>
+          <button onclick="showTokenSubTab('mine')" id="subtab-mine" class="subtab flex-1 px-4 py-2 rounded-md text-sm font-medium transition-all active">🔐 我的 Token</button>
         </div>
 
         <!-- 我的 Token 面板 -->
@@ -4296,11 +4410,6 @@ def render_user_page(user) -> str:
             <h2 class="text-lg font-bold">我的 Token</h2>
             <div class="flex-1 flex items-center gap-2 flex-wrap">
               <input type="text" id="tokensSearch" placeholder="搜索 ID 或状态..." oninput="filterTokens()" class="px-3 py-1.5 rounded-lg text-sm" style="background: var(--bg-input); border: 1px solid var(--border); min-width: 160px;">
-              <select id="tokenVisibilityFilter" onchange="filterTokens()" class="px-3 py-1.5 rounded-lg text-sm" style="background: var(--bg-input); border: 1px solid var(--border);">
-                <option value="">全部可见性</option>
-                <option value="public" class="public-only">公开</option>
-                <option value="private">私有</option>
-              </select>
               <select id="tokenStatusFilter" onchange="filterTokens()" class="px-3 py-1.5 rounded-lg text-sm" style="background: var(--bg-input); border: 1px solid var(--border);">
                 <option value="">全部状态</option>
                 <option value="active">有效</option>
@@ -4318,11 +4427,7 @@ def render_user_page(user) -> str:
             <button onclick="showDonateModal()" class="btn-primary">+ 添加 Token</button>
           </div>
           <div class="flex flex-wrap items-center gap-2 mb-4 text-xs">
-            <span style="color: var(--text-muted);">可见性</span>
-            <button type="button" class="filter-chip" data-group="visibility" data-value="" onclick="setTokenVisibility('')">全部</button>
-            <button type="button" class="filter-chip public-only" data-group="visibility" data-value="public" onclick="setTokenVisibility('public')">公开</button>
-            <button type="button" class="filter-chip" data-group="visibility" data-value="private" onclick="setTokenVisibility('private')">私有</button>
-            <span class="ml-2" style="color: var(--text-muted);">状态</span>
+            <span style="color: var(--text-muted);">状态</span>
             <button type="button" class="filter-chip" data-group="status" data-value="" onclick="setTokenStatus('')">全部</button>
             <button type="button" class="filter-chip" data-group="status" data-value="active" onclick="setTokenStatus('active')">有效</button>
             <button type="button" class="filter-chip" data-group="status" data-value="invalid" onclick="setTokenStatus('invalid')">无效</button>
@@ -4336,7 +4441,6 @@ def render_user_page(user) -> str:
                     <input type="checkbox" id="selectAllTokens" onchange="toggleAllTokens(this.checked)" class="cursor-pointer">
                   </th>
                   <th class="text-left py-3 px-3 cursor-pointer hover:text-indigo-400" onclick="sortTokens('id')">ID ↕</th>
-                  <th class="text-left py-3 px-3 cursor-pointer hover:text-indigo-400" onclick="sortTokens('visibility')">可见性 ↕</th>
                   <th class="text-left py-3 px-3 cursor-pointer hover:text-indigo-400" onclick="sortTokens('status')">状态 ↕</th>
                   <th class="text-left py-3 px-3">配额</th>
                   <th class="text-left py-3 px-3 cursor-pointer hover:text-indigo-400" onclick="sortTokens('success_rate')">成功率 ↕</th>
@@ -4345,7 +4449,7 @@ def render_user_page(user) -> str:
                 </tr>
               </thead>
               <tbody id="tokenTable">
-                <tr><td colspan="8" class="py-6 text-center" style="color: var(--text-muted);">加载中...</td></tr>
+                <tr><td colspan="7" class="py-6 text-center" style="color: var(--text-muted);">加载中...</td></tr>
               </tbody>
             </table>
           </div>
@@ -4353,50 +4457,6 @@ def render_user_page(user) -> str:
             <span id="tokensInfo" class="text-sm" style="color: var(--text-muted);"></span>
             <div id="tokensPages" class="flex gap-1"></div>
           </div>
-        </div>
-
-        <!-- 公开 Token 池面板 -->
-        <div id="subtab-panel-public" class="public-only" style="display: none;">
-          <div class="flex flex-wrap items-center gap-3 mb-4 toolbar">
-            <h2 class="text-lg font-bold">公开 Token 池</h2>
-            <div class="flex-1 flex items-center gap-2 flex-wrap">
-              <input type="text" id="publicTokenSearch" placeholder="搜索贡献者..." oninput="filterPublicTokens()" class="px-3 py-1.5 rounded-lg text-sm" style="background: var(--bg-input); border: 1px solid var(--border); min-width: 140px;">
-              <select id="publicTokenPageSize" onchange="filterPublicTokens()" class="px-3 py-1.5 rounded-lg text-sm" style="background: var(--bg-input); border: 1px solid var(--border);">
-                <option value="10">10 条/页</option>
-                <option value="20" selected>20 条/页</option>
-                <option value="50">50 条/页</option>
-              </select>
-              <button onclick="loadPublicTokens()" class="btn btn-primary text-sm px-3 py-1.5 rounded-lg" style="background: var(--primary); color: white;">刷新</button>
-            </div>
-            <div class="flex items-center gap-4 text-sm">
-              <span style="color: var(--text-muted);">共 <strong id="publicPoolCount" class="text-green-400">-</strong> 个</span>
-              <span style="color: var(--text-muted);">平均成功率 <strong id="publicPoolAvgRate" class="text-indigo-400">-</strong></span>
-            </div>
-          </div>
-          <div class="overflow-x-auto">
-            <table class="w-full text-sm data-table">
-              <thead>
-                <tr style="color: var(--text-muted); border-bottom: 1px solid var(--border);">
-                  <th class="text-left py-3 px-3">#</th>
-                  <th class="text-left py-3 px-3 cursor-pointer hover:text-indigo-400" onclick="sortPublicTokens('username')">贡献者 ↕</th>
-                  <th class="text-left py-3 px-3">状态</th>
-                  <th class="text-left py-3 px-3 cursor-pointer hover:text-indigo-400" onclick="sortPublicTokens('success_rate')">成功率 ↕</th>
-                  <th class="text-left py-3 px-3 cursor-pointer hover:text-indigo-400" onclick="sortPublicTokens('use_count')">使用次数 ↕</th>
-                  <th class="text-left py-3 px-3 cursor-pointer hover:text-indigo-400" onclick="sortPublicTokens('last_used')">最后使用 ↕</th>
-                </tr>
-              </thead>
-              <tbody id="publicTokenTable">
-                <tr><td colspan="6" class="py-6 text-center" style="color: var(--text-muted);">加载中...</td></tr>
-              </tbody>
-            </table>
-          </div>
-          <div id="publicTokenPagination" class="flex items-center justify-between mt-4 pt-4" style="border-top: 1px solid var(--border); display: none;">
-            <span id="publicTokenInfo" class="text-sm" style="color: var(--text-muted);"></span>
-            <div id="publicTokenPages" class="flex gap-1"></div>
-          </div>
-          <p class="mt-4 text-sm public-only" style="color: var(--text-muted);">
-            💡 公开 Token 池由社区成员自愿贡献，供所有用户共享使用。您也可以切换到"我的 Token"添加您的 Token。
-          </p>
         </div>
       </div>
     </div>
@@ -4464,10 +4524,69 @@ def render_user_page(user) -> str:
         </p>
       </div>
     </div>
+    <div id="panel-usage" class="tab-panel" style="display: none;">
+      <div class="card">
+        <div class="flex flex-wrap justify-between items-center gap-4 mb-6">
+          <h2 class="text-lg font-bold">📊 Token 使用统计</h2>
+          <div class="flex items-center gap-2">
+            <select id="usagePeriod" onchange="loadUsageStats()" class="px-3 py-2 rounded-lg text-sm" style="background: var(--bg-input); border: 1px solid var(--border);">
+              <option value="7">最近 7 天</option>
+              <option value="30" selected>最近 30 天</option>
+              <option value="90">最近 90 天</option>
+              <option value="365">最近一年</option>
+            </select>
+            <button onclick="loadUsageStats()" class="btn-primary text-sm px-3 py-1.5">刷新</button>
+          </div>
+        </div>
+        <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
+          <div class="p-4 rounded-lg text-center" style="background: var(--bg-input);">
+            <div class="text-2xl font-bold text-indigo-400" id="usageRequestCount">-</div>
+            <div class="text-sm" style="color: var(--text-muted);">请求次数</div>
+          </div>
+          <div class="p-4 rounded-lg text-center" style="background: var(--bg-input);">
+            <div class="text-2xl font-bold text-green-400" id="usagePromptTokens">-</div>
+            <div class="text-sm" style="color: var(--text-muted);">输入 Tokens</div>
+          </div>
+          <div class="p-4 rounded-lg text-center" style="background: var(--bg-input);">
+            <div class="text-2xl font-bold text-amber-400" id="usageCompletionTokens">-</div>
+            <div class="text-sm" style="color: var(--text-muted);">输出 Tokens</div>
+          </div>
+          <div class="p-4 rounded-lg text-center" style="background: var(--bg-input);">
+            <div class="text-2xl font-bold text-purple-400" id="usageTotalTokens">-</div>
+            <div class="text-sm" style="color: var(--text-muted);">总 Tokens</div>
+          </div>
+        </div>
+        <div class="mb-6">
+          <h3 class="font-bold mb-3">按模型统计</h3>
+          <div id="usageByModel" class="space-y-2">
+            <div class="text-sm text-center py-4" style="color: var(--text-muted);">加载中...</div>
+          </div>
+        </div>
+        <div>
+          <h3 class="font-bold mb-3">每日使用趋势</h3>
+          <div id="usageHistory" class="overflow-x-auto">
+            <table class="w-full text-sm data-table">
+              <thead>
+                <tr style="color: var(--text-muted); border-bottom: 1px solid var(--border);">
+                  <th class="text-left py-2 px-3">日期</th>
+                  <th class="text-right py-2 px-3">请求数</th>
+                  <th class="text-right py-2 px-3">输入</th>
+                  <th class="text-right py-2 px-3">输出</th>
+                  <th class="text-right py-2 px-3">总计</th>
+                </tr>
+              </thead>
+              <tbody id="usageHistoryTable">
+                <tr><td colspan="5" class="py-4 text-center" style="color: var(--text-muted);">加载中...</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </div>
     <div id="panel-settings" class="tab-panel" style="display: none;">
       <div class="card">
         <h2 class="text-lg font-bold mb-4">⚙️ 模型设置</h2>
-        <div class="p-4 rounded-lg" style="background: var(--bg-input);">
+        <div class="p-4 rounded-lg mb-4" style="background: var(--bg-input);">
           <div class="font-medium mb-2">强制模型</div>
           <div class="text-sm mb-3" style="color: var(--text-muted);">覆盖所有请求使用的模型，留空则使用客户端请求的模型</div>
           <select id="forceModelSelect" onchange="saveForceModel(this.value)" class="w-full rounded px-3 py-2"
@@ -4479,6 +4598,21 @@ def render_user_page(user) -> str:
             <option value="claude-haiku-4-5">claude-haiku-4-5（快速模型）</option>
             <option value="claude-3-7-sonnet-20250219">claude-3-7-sonnet（旧版）</option>
           </select>
+        </div>
+        <div class="p-4 rounded-lg" style="background: var(--bg-input);">
+          <div class="font-medium mb-2">Token 分配策略</div>
+          <div class="text-sm mb-3" style="color: var(--text-muted);">选择多个 Token 时的使用方式</div>
+          <select id="tokenStrategySelect" onchange="saveTokenStrategy(this.value)" class="w-full rounded px-3 py-2"
+            style="background: var(--bg-card); border: 1px solid var(--border); color: var(--text);">
+            <option value="score_based">评分优先（默认）- 综合成功率、新鲜度、负载均衡选择最优 Token</option>
+            <option value="round_robin">轮询模式 - 多账号同时使用，均匀分配请求到所有 Token</option>
+            <option value="sequential">顺序模式 - 用完一个再用下一个，单 Token 集中使用</option>
+          </select>
+          <div class="mt-3 text-xs space-y-1" style="color: var(--text-muted);">
+            <p><strong>评分优先：</strong>根据 Token 的成功率、最近使用时间、使用频率综合评分，自动选择最优 Token</p>
+            <p><strong>轮询模式：</strong>每次请求轮流使用不同的 Token，适合多账号负载均衡</p>
+            <p><strong>顺序模式：</strong>优先使用第一个 Token，直到失败率过高才切换，适合节省配额</p>
+          </div>
         </div>
       </div>
     </div>
@@ -4499,30 +4633,6 @@ def render_user_page(user) -> str:
         <label class="text-sm font-medium mb-2 block">📁 或上传 JSON 文件</label>
         <input id="donateFile" type="file" accept=".json" class="w-full text-sm p-2 rounded-lg" style="background: var(--bg-input); border: 1px solid var(--border);">
         <p class="text-xs mt-1" style="color: var(--text-muted);">支持 Kiro Account Manager 导出的 JSON 文件</p>
-      </div>
-
-      <!-- 可见性选择 -->
-      <div class="mb-3">
-        <label class="text-sm font-medium mb-2 block">🔒 可见性设置</label>
-        <div class="flex gap-2">
-          <button onclick="setDonateMode('private')" id="donateMode-private" class="donate-mode-btn flex-1 px-4 py-2 rounded-lg text-sm font-medium transition-all" style="background: var(--bg-input); border: 1px solid var(--border);">
-            🔐 私有
-          </button>
-          <button onclick="setDonateMode('public')" id="donateMode-public" class="donate-mode-btn flex-1 px-4 py-2 rounded-lg text-sm font-medium transition-all public-only" style="background: var(--bg-input); border: 1px solid var(--border);">
-            🌐 公开
-          </button>
-        </div>
-      </div>
-
-      <!-- 匿名选项（仅公开模式显示） -->
-      <div id="anonymousOption" class="mb-4 p-3 rounded-lg public-only" style="background: var(--bg-input); border: 1px solid var(--border); display: none;">
-        <label class="flex items-center gap-2 cursor-pointer">
-          <input type="checkbox" id="donateAnonymous" class="w-4 h-4 rounded">
-          <div class="text-sm">
-            <span class="font-medium">匿名贡献</span>
-            <p class="text-xs mt-0.5" style="color: var(--text-muted);">不显示您的用户名</p>
-          </div>
-        </label>
       </div>
 
       <input type="hidden" id="donateVisibility" value="private">
@@ -4702,19 +4812,7 @@ def render_user_page(user) -> str:
     }}
 
     function applySelfUseMode() {{
-      if (!SELF_USE_MODE) return;
-      const publicOption = document.querySelector('#tokenVisibilityFilter option[value="public"]');
-      if (publicOption) publicOption.remove();
-      const visibilityFilter = document.getElementById('tokenVisibilityFilter');
-      if (visibilityFilter && visibilityFilter.value === 'public') visibilityFilter.value = '';
-    }}
-
-    function setTokenVisibility(value) {{
-      const select = document.getElementById('tokenVisibilityFilter');
-      if (!select) return;
-      select.value = value;
-      updateTokenChips();
-      filterTokens();
+      // No longer needed, kept for compatibility
     }}
 
     function setTokenStatus(value) {{
@@ -4726,11 +4824,7 @@ def render_user_page(user) -> str:
     }}
 
     function updateTokenChips() {{
-      const visibility = document.getElementById('tokenVisibilityFilter')?.value ?? '';
       const status = document.getElementById('tokenStatusFilter')?.value ?? '';
-      document.querySelectorAll('.filter-chip[data-group="visibility"]').forEach(chip => {{
-        chip.classList.toggle('active', chip.dataset.value === visibility);
-      }});
       document.querySelectorAll('.filter-chip[data-group="status"]').forEach(chip => {{
         chip.classList.toggle('active', chip.dataset.value === status);
       }});
@@ -4776,20 +4870,16 @@ def render_user_page(user) -> str:
         guideText.textContent = '先添加 Refresh Token，再生成 API Key，即可开始调用。';
         guideActions.innerHTML = `
           <button type="button" onclick="showTab('tokens'); showTokenSubTab('mine'); showDonateModal();" class="btn-primary text-sm px-3 py-1.5">添加 Token</button>
-          <button type="button" onclick="showTab('keys'); generateKey();" class="text-sm px-3 py-1.5 rounded-lg" style="background: var(--bg-input); border: 1px solid var(--border);">生成 API Key</button>
           <a href="/docs" class="text-sm px-3 py-1.5 rounded-lg" style="background: var(--bg-input); border: 1px solid var(--border);">查看文档</a>
         `;
         return;
       }}
 
       if (tokenCount === 0) {{
-        guideTitle.textContent = SELF_USE_MODE ? '自用模式需先添加 Token' : '补充 Token 获取更稳定体验';
-        guideText.textContent = SELF_USE_MODE
-          ? '自用模式下必须添加私有 Token 才能生成 API Key。'
-          : '当前 API Key 将使用公开 Token 池，建议添加自己的 Token。';
+        guideTitle.textContent = '请先添加 Token';
+        guideText.textContent = '添加您的 Refresh Token 后才能生成 API Key。';
         guideActions.innerHTML = `
           <button type="button" onclick="showTab('tokens'); showTokenSubTab('mine'); showDonateModal();" class="btn-primary text-sm px-3 py-1.5">添加 Token</button>
-          ${{SELF_USE_MODE ? '' : '<button type="button" onclick="showTab(\\'tokens\\'); showTokenSubTab(\\'public\\');" class="text-sm px-3 py-1.5 rounded-lg public-only" style="background: var(--bg-input); border: 1px solid var(--border);">查看公开 Token 池</button>'}}
         `;
         return;
       }}
@@ -4818,7 +4908,8 @@ def render_user_page(user) -> str:
       document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
       document.getElementById('panel-' + tab).style.display = 'block';
       document.getElementById('tab-' + tab).classList.add('active');
-      if (tab === 'settings') refreshForceModel();
+      if (tab === 'settings') { refreshForceModel(); refreshTokenStrategy(); }
+      if (tab === 'usage') loadUsageStats();
     }}
 
     // 强制模型设置
@@ -4844,6 +4935,37 @@ def render_user_page(user) -> str:
         const d = await r.json();
         const select = document.getElementById('forceModelSelect');
         if (select) select.value = d.force_model || '';
+      }} catch (e) {{ console.error(e); }}
+    }}
+
+    // Token 分配策略设置
+    async function saveTokenStrategy(strategy) {{
+      const fd = new FormData();
+      fd.append('strategy', strategy);
+      try {{
+        const r = await fetch('/user/api/token-strategy', {{ method: 'POST', body: fd }});
+        const d = await r.json();
+        if (d.success) {{
+          const labels = {{
+            'score_based': '评分优先',
+            'round_robin': '轮询模式',
+            'sequential': '顺序模式'
+          }};
+          alert('Token 分配策略已更新：' + (labels[strategy] || strategy));
+        }} else {{
+          alert(d.error || '保存失败');
+        }}
+      }} catch (e) {{
+        alert('保存失败');
+      }}
+    }}
+
+    async function refreshTokenStrategy() {{
+      try {{
+        const r = await fetch('/user/api/token-strategy');
+        const d = await r.json();
+        const select = document.getElementById('tokenStrategySelect');
+        if (select) select.value = d.token_strategy || 'score_based';
       }} catch (e) {{ console.error(e); }}
     }}
 
@@ -4897,25 +5019,33 @@ def render_user_page(user) -> str:
         const r = await fetch('/user/api/profile');
         const d = await r.json();
         document.getElementById('tokenCount').textContent = d.token_count || 0;
-        document.getElementById('publicTokenCount').textContent = d.public_token_count || 0;
         document.getElementById('apiKeyCount').textContent = d.api_key_count || 0;
-        document.getElementById('requestCount').textContent = '-';
         userHasTokens = (d.token_count || 0) > 0;
         updateUserGuide(d);
-      }} catch (e) {{ console.error(e); }}
+        
+        // 获取请求统计
+        const statsR = await fetch('/user/api/usage-stats?days=365');
+        if (statsR.ok) {{
+          const statsD = await statsR.json();
+          document.getElementById('requestCount').textContent = statsD.stats?.request_count || 0;
+        }} else {{
+          document.getElementById('requestCount').textContent = 0;
+        }}
+      }} catch (e) {{ 
+        console.error(e);
+        document.getElementById('requestCount').textContent = 0;
+      }}
     }}
 
     async function loadTokens() {{
       try {{
         const pageSize = parseInt(document.getElementById('tokensPageSize').value);
         const search = document.getElementById('tokensSearch').value.trim();
-        const visibility = document.getElementById('tokenVisibilityFilter').value;
         const status = document.getElementById('tokenStatusFilter').value;
         const d = await fetchJson('/user/api/tokens' + buildQuery({{
           page: tokensCurrentPage,
           page_size: pageSize,
           search,
-          visibility,
           status,
           sort_field: tokensSortField,
           sort_order: tokensSortAsc ? 'asc' : 'desc'
@@ -5001,25 +5131,18 @@ def render_user_page(user) -> str:
     function renderTokenTable(tokens) {{
       const tb = document.getElementById('tokenTable');
       if (!tokens || !tokens.length) {{
-        tb.innerHTML = '<tr><td colspan="8" class="py-8 text-center" style="color: var(--text-muted);"><div class="mb-3">还没有 Token，先添加一个吧</div><button type="button" onclick="showDonateModal()" class="btn-primary text-sm px-3 py-1.5">+ 添加 Token</button></td></tr>';
+        tb.innerHTML = '<tr><td colspan="7" class="py-8 text-center" style="color: var(--text-muted);"><div class="mb-3">还没有 Token，先添加一个吧</div><button type="button" onclick="showDonateModal()" class="btn-primary text-sm px-3 py-1.5">+ 添加 Token</button></td></tr>';
         document.getElementById('tokensPagination').style.display = 'none';
         document.getElementById('selectAllTokens').checked = false;
         return;
       }}
       tb.innerHTML = tokens.map(t => {{
-        const canToggle = !SELF_USE_MODE || t.visibility === 'public';
-        const toggleTarget = t.visibility === 'public' ? 'private' : 'public';
-        const toggleLabel = SELF_USE_MODE ? '设为私有' : '切换';
-        const toggleBtn = canToggle
-          ? `<button onclick="toggleVisibility(${{t.id}}, '${{toggleTarget}}')" class="text-xs px-2 py-1 rounded bg-indigo-500/20 text-indigo-400 mr-1">${{toggleLabel}}</button>`
-          : '';
         return `
           <tr class="table-row">
             <td class="py-3 px-3">
               <input type="checkbox" class="token-checkbox" data-token-id="${{t.id}}" onchange="toggleTokenSelection(${{t.id}}, this.checked)" ${{selectedTokenIds.has(t.id) ? 'checked' : ''}} style="cursor: pointer;">
             </td>
             <td class="py-3 px-3">#${{t.id}}</td>
-            <td class="py-3 px-3"><span class="${{t.visibility === 'public' ? 'text-green-400' : 'text-blue-400'}}">${{t.visibility === 'public' ? '公开' : '私有'}}</span></td>
             <td class="py-3 px-3">${{renderTokenStatus(t.status)}}</td>
             <td class="py-3 px-3">
               ${{formatQuota(t.usage_data)}}
@@ -5028,7 +5151,7 @@ def render_user_page(user) -> str:
             <td class="py-3 px-3">${{formatSuccessRate(t.success_rate)}}</td>
             <td class="py-3 px-3">${{t.last_used ? new Date(t.last_used).toLocaleString() : '-'}}</td>
             <td class="py-3 px-3">
-              ${{toggleBtn}}
+              <button onclick="revalidateToken(${{t.id}}, this)" class="text-xs px-2 py-1 rounded bg-emerald-500/20 text-emerald-400 mr-1">验证</button>
               <button onclick="deleteToken(${{t.id}})" class="text-xs px-2 py-1 rounded bg-red-500/20 text-red-400">删除</button>
             </td>
           </tr>
@@ -5383,50 +5506,22 @@ def render_user_page(user) -> str:
 
     function showDonateModal() {{
       document.getElementById('donateModal').style.display = 'flex';
-      if (SELF_USE_MODE) setDonateMode('private');
     }}
 
     function hideDonateModal() {{
       document.getElementById('donateModal').style.display = 'none';
-      setDonateMode('private');
       document.getElementById('donateTokens').value = '';
       document.getElementById('donateFile').value = '';
-      document.getElementById('donateAnonymous').checked = false;
     }}
 
-    function setDonateMode(mode) {{
-      if (SELF_USE_MODE && mode === 'public') mode = 'private';
-      const privateBtn = document.getElementById('donateMode-private');
-      const publicBtn = document.getElementById('donateMode-public');
-      const anonOption = document.getElementById('anonymousOption');
-
-      if (mode === 'private') {{
-        privateBtn.classList.add('active');
-        if (publicBtn) publicBtn.classList.remove('active');
-        anonOption.style.display = 'none';
-      }} else {{
-        privateBtn.classList.remove('active');
-        if (publicBtn) publicBtn.classList.add('active');
-        anonOption.style.display = 'block';
-      }}
-      document.getElementById('donateVisibility').value = mode;
-    }}
-
-    function showKeyModal(key, usePublicPool) {{
+    function showKeyModal(key) {{
       document.getElementById('generatedKey').textContent = key;
       document.getElementById('copyStatus').style.display = 'none';
       const infoEl = document.getElementById('tokenSourceInfo');
-      if (usePublicPool && !SELF_USE_MODE) {{
-        infoEl.innerHTML = '💡 <strong>提示：</strong>您尚未添加 Token，此 Key 将使用公开 Token 池。添加自己的 Token 可获得更稳定的服务。';
-        infoEl.style.display = 'block';
-        infoEl.style.background = 'rgba(245, 158, 11, 0.15)';
-        infoEl.style.color = '#f59e0b';
-      }} else {{
-        infoEl.innerHTML = '✅ <strong>提示：</strong>此 Key 将优先使用您添加的私有 Token。';
-        infoEl.style.display = 'block';
-        infoEl.style.background = 'rgba(34, 197, 94, 0.15)';
-        infoEl.style.color = '#22c55e';
-      }}
+      infoEl.innerHTML = '✅ <strong>提示：</strong>此 Key 将使用您添加的私有 Token。';
+      infoEl.style.display = 'block';
+      infoEl.style.background = 'rgba(34, 197, 94, 0.15)';
+      infoEl.style.color = '#22c55e';
       document.getElementById('keyModal').style.display = 'flex';
     }}
 
@@ -5464,19 +5559,6 @@ def render_user_page(user) -> str:
         }});
       }}
 
-      // 获取设置
-      const visibility = document.getElementById('donateVisibility').value;
-      if (SELF_USE_MODE && visibility === 'public') {{
-        return showConfirmModal({{
-          title: '提示',
-          message: '自用模式下禁止公开 Token，请选择个人使用。',
-          icon: '🔒',
-          confirmText: '好的',
-          danger: false
-        }});
-      }}
-      const anonymous = document.getElementById('donateAnonymous').checked;
-
       // 构建请求
       const fd = new FormData();
       if (file) {{
@@ -5484,8 +5566,7 @@ def render_user_page(user) -> str:
       }} else {{
         fd.append('tokens_text', tokensText);
       }}
-      fd.append('visibility', visibility);
-      if (visibility === 'public' && anonymous) fd.append('anonymous', 'true');
+      fd.append('visibility', 'private');
 
       // 提交
       try {{
@@ -5522,32 +5603,6 @@ def render_user_page(user) -> str:
       }}
     }}
 
-    async function toggleVisibility(tokenId, newVisibility) {{
-      if (SELF_USE_MODE && newVisibility === 'public') {{
-        await showConfirmModal({{
-          title: '自用模式',
-          message: '自用模式下禁止将 Token 设为公开。',
-          icon: '🔒',
-          confirmText: '好的',
-          danger: false
-        }});
-        return;
-      }}
-      const confirmed = await showConfirmModal({{
-        title: '切换可见性',
-        message: `确定将此 Token 切换为${{newVisibility === 'public' ? '公开' : '私有'}}吗？${{newVisibility === 'public' ? '\\n公开后将加入公共池供所有用户使用。' : ''}}`,
-        icon: '🔄',
-        confirmText: '确认切换',
-        danger: false
-      }});
-      if (!confirmed) return;
-      const fd = new FormData();
-      fd.append('visibility', newVisibility);
-      await fetch('/user/api/tokens/' + tokenId, {{ method: 'PUT', body: fd }});
-      loadTokens();
-      loadProfile();
-    }}
-
     async function deleteToken(tokenId) {{
       const confirmed = await showConfirmModal({{
         title: '删除 Token',
@@ -5560,6 +5615,45 @@ def render_user_page(user) -> str:
       await fetch('/user/api/tokens/' + tokenId, {{ method: 'DELETE' }});
       loadTokens();
       loadProfile();
+    }}
+
+    async function revalidateToken(tokenId, btn) {{
+      const originalText = btn.textContent;
+      btn.textContent = '验证中...';
+      btn.disabled = true;
+      try {{
+        const r = await fetch('/user/api/tokens/' + tokenId + '/revalidate', {{ method: 'POST' }});
+        const d = await r.json();
+        if (d.success) {{
+          await showConfirmModal({{
+            title: d.status === 'active' ? '验证成功' : '验证失败',
+            message: d.message,
+            icon: d.status === 'active' ? '✅' : '❌',
+            confirmText: '好的',
+            danger: false
+          }});
+          loadTokens();
+        }} else {{
+          await showConfirmModal({{
+            title: '验证失败',
+            message: d.error || '验证请求失败',
+            icon: '❌',
+            confirmText: '好的',
+            danger: false
+          }});
+        }}
+      }} catch (e) {{
+        await showConfirmModal({{
+          title: '错误',
+          message: '验证请求失败，请稍后重试',
+          icon: '❌',
+          confirmText: '好的',
+          danger: false
+        }});
+      }} finally {{
+        btn.textContent = originalText;
+        btn.disabled = false;
+      }}
     }}
 
     async function generateKey() {{
@@ -5577,24 +5671,14 @@ def render_user_page(user) -> str:
 
       // 如果用户没有 Token，先提示
       if (!userHasTokens) {{
-        if (SELF_USE_MODE) {{
-          await showConfirmModal({{
-            title: '提示',
-            message: '自用模式下必须先添加私有 Token 才能生成 API Key。',
-            icon: '🔒',
-            confirmText: '好的',
-            danger: false
-          }});
-          return;
-        }}
-        const proceed = await showConfirmModal({{
+        await showConfirmModal({{
           title: '提示',
-          message: '您尚未添加任何 Token。生成的 API Key 将使用公开 Token 池，可能会有配额限制。\\n\\n建议先添加您的 Token 以获得更好的体验。\\n\\n是否继续生成？',
+          message: '您尚未添加任何 Token，请先添加 Token 后再生成 API Key。',
           icon: '💡',
-          confirmText: '继续生成',
+          confirmText: '好的',
           danger: false
         }});
-        if (!proceed) return;
+        return;
       }}
 
       // 弹出输入名称的对话框
@@ -5607,7 +5691,7 @@ def render_user_page(user) -> str:
         const r = await fetch('/user/api/keys', {{ method: 'POST', body: fd }});
         const d = await r.json();
         if (d.success) {{
-          showKeyModal(d.key, d.uses_public_pool);
+          showKeyModal(d.key);
           loadKeys();
           loadProfile();
         }} else {{
@@ -5692,155 +5776,11 @@ def render_user_page(user) -> str:
       setTimeout(() => {{ status.style.display = 'none'; }}, 2000);
     }}
 
-    // 公开 Token 池状态
-    let allPublicTokens = [];
-    let publicTokenCurrentPage = 1;
-    let publicTokenSortField = 'success_rate';
-    let publicTokenSortAsc = false;
-
     function showTokenSubTab(tab) {{
       const mineBtn = document.getElementById('subtab-mine');
-      const publicBtn = document.getElementById('subtab-public');
       const minePanel = document.getElementById('subtab-panel-mine');
-      const publicPanel = document.getElementById('subtab-panel-public');
-
-      if (tab === 'mine') {{
-        mineBtn.classList.add('active');
-        if (publicBtn) publicBtn.classList.remove('active');
-        minePanel.style.display = 'block';
-        if (publicPanel) publicPanel.style.display = 'none';
-      }} else {{
-        if (SELF_USE_MODE || !publicBtn || !publicPanel) return;
-        mineBtn.classList.remove('active');
-        publicBtn.classList.add('active');
-        minePanel.style.display = 'none';
-        publicPanel.style.display = 'block';
-        if (allPublicTokens.length === 0) loadPublicTokens();
-      }}
-    }}
-
-    async function loadPublicTokens() {{
-      try {{
-        if (SELF_USE_MODE) return;
-        const r = await fetch('/api/public-tokens');
-        if (!r.ok) {{
-          const tb = document.getElementById('publicTokenTable');
-          if (tb) {{
-            tb.innerHTML = '<tr><td colspan="6" class="py-6 text-center" style="color: var(--text-muted);">自用模式下不开放公开 Token 池</td></tr>';
-          }}
-          return;
-        }}
-        const d = await r.json();
-        allPublicTokens = (d.tokens || []).map(t => ({{
-          ...t,
-          use_count: (t.success_count || 0) + (t.fail_count || 0)
-        }}));
-        document.getElementById('publicPoolCount').textContent = d.count || 0;
-        if (allPublicTokens.length > 0) {{
-          const avgRate = allPublicTokens.reduce((sum, t) => sum + (normalizeSuccessRate(t.success_rate) ?? 0), 0) / allPublicTokens.length;
-          document.getElementById('publicPoolAvgRate').textContent = formatSuccessRate(avgRate, 1);
-        }} else {{
-          document.getElementById('publicPoolAvgRate').textContent = '-';
-        }}
-        publicTokenCurrentPage = 1;
-        filterPublicTokens();
-      }} catch (e) {{ console.error(e); }}
-    }}
-
-    function filterPublicTokens() {{
-      const search = document.getElementById('publicTokenSearch').value.toLowerCase();
-      const pageSize = parseInt(document.getElementById('publicTokenPageSize').value);
-
-      let filtered = allPublicTokens.filter(t =>
-        (t.username || '').toLowerCase().includes(search)
-      );
-
-      filtered.sort((a, b) => {{
-        let va = a[publicTokenSortField], vb = b[publicTokenSortField];
-        if (publicTokenSortField === 'last_used') {{
-          va = va ? new Date(va).getTime() : 0;
-          vb = vb ? new Date(vb).getTime() : 0;
-        }}
-        if (va < vb) return publicTokenSortAsc ? -1 : 1;
-        if (va > vb) return publicTokenSortAsc ? 1 : -1;
-        return 0;
-      }});
-
-      const totalPages = Math.ceil(filtered.length / pageSize) || 1;
-      if (publicTokenCurrentPage > totalPages) publicTokenCurrentPage = totalPages;
-      const start = (publicTokenCurrentPage - 1) * pageSize;
-      const paged = filtered.slice(start, start + pageSize);
-
-      renderPublicTokenTable(paged);
-      renderPublicTokenPagination(filtered.length, pageSize, totalPages);
-    }}
-
-    function sortPublicTokens(field) {{
-      if (publicTokenSortField === field) {{
-        publicTokenSortAsc = !publicTokenSortAsc;
-      }} else {{
-        publicTokenSortField = field;
-        publicTokenSortAsc = false;
-      }}
-      filterPublicTokens();
-    }}
-
-    function goPublicTokensPage(page) {{
-      publicTokenCurrentPage = page;
-      filterPublicTokens();
-    }}
-
-    function renderPublicTokenTable(tokens) {{
-      const tb = document.getElementById('publicTokenTable');
-      if (!tokens.length) {{
-        tb.innerHTML = `<tr><td colspan="6" class="py-8 text-center" style="color: var(--text-muted);"><div class="mb-3">暂无公开 Token，欢迎一起贡献</div><button type="button" onclick="showTokenSubTab('mine'); showDonateModal();" class="text-sm px-3 py-1.5 rounded-lg" style="background: var(--bg-input); border: 1px solid var(--border);">去添加 Token</button></td></tr>`;
-        return;
-      }}
-      tb.innerHTML = tokens.map((t, i) => {{
-        const username = escapeHtml(t.username || '匿名');
-        const rate = normalizeSuccessRate(t.success_rate) ?? 0;
-        const rateClass = rate >= 80 ? 'text-green-400' : rate >= 50 ? 'text-yellow-400' : 'text-red-400';
-        return `
-        <tr class="table-row">
-          <td class="py-3 px-3">${{(publicTokenCurrentPage - 1) * parseInt(document.getElementById('publicTokenPageSize').value) + i + 1}}</td>
-          <td class="py-3 px-3">${{username}}</td>
-          <td class="py-3 px-3">${{renderTokenStatus(t.status)}}</td>
-          <td class="py-3 px-3"><span class="${{rateClass}}">${{formatSuccessRate(rate, 1)}}</span></td>
-          <td class="py-3 px-3">${{t.use_count || 0}}</td>
-          <td class="py-3 px-3">${{t.last_used ? new Date(t.last_used).toLocaleString() : '-'}}</td>
-        </tr>
-      `;
-      }}).join('');
-    }}
-
-    function renderPublicTokenPagination(total, pageSize, totalPages) {{
-      const pagination = document.getElementById('publicTokenPagination');
-      const info = document.getElementById('publicTokenInfo');
-      const pages = document.getElementById('publicTokenPages');
-
-      if (total === 0) {{
-        pagination.style.display = 'none';
-        return;
-      }}
-
-      pagination.style.display = 'flex';
-      const start = (publicTokenCurrentPage - 1) * pageSize + 1;
-      const end = Math.min(publicTokenCurrentPage * pageSize, total);
-      info.textContent = `显示 ${{start}}-${{end}} 条，共 ${{total}} 条`;
-
-      let html = '';
-      if (publicTokenCurrentPage > 1) html += `<button onclick="goPublicTokensPage(${{publicTokenCurrentPage - 1}})" class="px-3 py-1 rounded text-sm" style="background: var(--bg-input);">上一页</button>`;
-
-      for (let i = 1; i <= totalPages; i++) {{
-        if (i === 1 || i === totalPages || (i >= publicTokenCurrentPage - 1 && i <= publicTokenCurrentPage + 1)) {{
-          html += `<button onclick="goPublicTokensPage(${{i}})" class="px-3 py-1 rounded text-sm ${{i === publicTokenCurrentPage ? 'text-white' : ''}}" style="background: ${{i === publicTokenCurrentPage ? 'var(--primary)' : 'var(--bg-input)'}};">${{i}}</button>`;
-        }} else if (i === publicTokenCurrentPage - 2 || i === publicTokenCurrentPage + 2) {{
-          html += '<span class="px-2">...</span>';
-        }}
-      }}
-
-      if (publicTokenCurrentPage < totalPages) html += `<button onclick="goPublicTokensPage(${{publicTokenCurrentPage + 1}})" class="px-3 py-1 rounded text-sm" style="background: var(--bg-input);">下一页</button>`;
-      pages.innerHTML = html;
+      mineBtn.classList.add('active');
+      minePanel.style.display = 'block';
     }}
 
     applySelfUseMode();
@@ -5855,6 +5795,75 @@ def render_user_page(user) -> str:
     loadProfile();
     loadTokens();
     loadKeys();
+
+    // Token 使用统计
+    function formatNumber(num) {{
+      if (num >= 1000000) return (num / 1000000).toFixed(1) + 'M';
+      if (num >= 1000) return (num / 1000).toFixed(1) + 'K';
+      return num.toString();
+    }}
+
+    async function loadUsageStats() {{
+      const days = parseInt(document.getElementById('usagePeriod').value);
+      try {{
+        const r = await fetch('/user/api/usage-stats?days=' + days);
+        if (!r.ok) throw new Error('Failed to load usage stats');
+        const d = await r.json();
+        const stats = d.stats || {{}};
+        const history = d.history || [];
+
+        document.getElementById('usageRequestCount').textContent = formatNumber(stats.request_count || 0);
+        document.getElementById('usagePromptTokens').textContent = formatNumber(stats.total_prompt_tokens || 0);
+        document.getElementById('usageCompletionTokens').textContent = formatNumber(stats.total_completion_tokens || 0);
+        document.getElementById('usageTotalTokens').textContent = formatNumber(stats.total_tokens || 0);
+
+        const byModel = stats.by_model || [];
+        const modelContainer = document.getElementById('usageByModel');
+        if (byModel.length === 0) {{
+          modelContainer.innerHTML = '<div class="text-sm text-center py-4" style="color: var(--text-muted);">暂无数据</div>';
+        }} else {{
+          const maxTokens = Math.max(...byModel.map(m => m.total_tokens));
+          modelContainer.innerHTML = byModel.map(m => {{
+            const pct = maxTokens > 0 ? (m.total_tokens / maxTokens * 100) : 0;
+            return `
+              <div class="p-3 rounded-lg" style="background: var(--bg-input);">
+                <div class="flex justify-between items-center mb-2">
+                  <span class="font-medium text-sm">${{escapeHtml(m.model)}}</span>
+                  <span class="text-sm" style="color: var(--text-muted);">${{m.request_count}} 次请求</span>
+                </div>
+                <div class="h-2 rounded-full overflow-hidden" style="background: var(--border);">
+                  <div class="h-full rounded-full" style="width: ${{pct}}%; background: linear-gradient(90deg, var(--primary), var(--accent));"></div>
+                </div>
+                <div class="flex justify-between text-xs mt-1" style="color: var(--text-muted);">
+                  <span>输入: ${{formatNumber(m.prompt_tokens)}}</span>
+                  <span>输出: ${{formatNumber(m.completion_tokens)}}</span>
+                  <span>总计: ${{formatNumber(m.total_tokens)}}</span>
+                </div>
+              </div>
+            `;
+          }}).join('');
+        }}
+
+        const historyTable = document.getElementById('usageHistoryTable');
+        if (history.length === 0) {{
+          historyTable.innerHTML = '<tr><td colspan="5" class="py-4 text-center" style="color: var(--text-muted);">暂无数据</td></tr>';
+        }} else {{
+          historyTable.innerHTML = history.map(h => `
+            <tr class="table-row">
+              <td class="py-2 px-3">${{escapeHtml(h.date)}}</td>
+              <td class="py-2 px-3 text-right">${{h.request_count}}</td>
+              <td class="py-2 px-3 text-right">${{formatNumber(h.prompt_tokens)}}</td>
+              <td class="py-2 px-3 text-right">${{formatNumber(h.completion_tokens)}}</td>
+              <td class="py-2 px-3 text-right">${{formatNumber(h.total_tokens)}}</td>
+            </tr>
+          `).join('');
+        }}
+      }} catch (e) {{
+        console.error('Failed to load usage stats:', e);
+        document.getElementById('usageByModel').innerHTML = '<div class="text-sm text-center py-4 text-red-400">加载失败</div>';
+        document.getElementById('usageHistoryTable').innerHTML = '<tr><td colspan="5" class="py-4 text-center text-red-400">加载失败</td></tr>';
+      }}
+    }}
   </script>
 </body>
 </html>'''
