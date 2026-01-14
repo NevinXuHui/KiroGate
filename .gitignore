@@ -1,5 +1,5 @@
 # Environment
-# .env
+.env
 .env.local
 
 # IDE
@@ -32,5 +32,11 @@ htmlcov/
 
 # Data files
 data/
-.history
-.lh
+
+# Sync conflict files
+*.sync-conflict-*
+.sync-conflict-*
+
+# Local history
+.history/
+.lh/

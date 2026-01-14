@@ -132,8 +132,7 @@ class PrometheusMetrics:
                     path TEXT,
                     status INTEGER,
                     duration REAL,
-                    model TEXT,
-                    client TEXT
+                    model TEXT
                 );
                 CREATE INDEX IF NOT EXISTS idx_recent_ts ON recent_requests(timestamp);
                 CREATE TABLE IF NOT EXISTS ip_stats (
@@ -152,20 +151,6 @@ class PrometheusMetrics:
                 );
             ''')
             conn.commit()
-            # Migrate: add client column if not exists
-            self._migrate_add_client_column(conn)
-
-    def _migrate_add_client_column(self, conn: sqlite3.Connection) -> None:
-        """Migrate: add client column to recent_requests if not exists."""
-        try:
-            cursor = conn.execute("PRAGMA table_info(recent_requests)")
-            columns = [row[1] for row in cursor.fetchall()]
-            if "client" not in columns:
-                conn.execute("ALTER TABLE recent_requests ADD COLUMN client TEXT")
-                conn.commit()
-                logger.info("Migrated recent_requests table: added client column")
-        except Exception as e:
-            logger.debug(f"Migration check failed: {e}")
 
     def _load_from_db(self) -> None:
         """Load metrics from SQLite database."""
@@ -198,13 +183,13 @@ class PrometheusMetrics:
 
                 # Load recent requests (last 50)
                 cursor = conn.execute(
-                    "SELECT timestamp, api_type, path, status, duration, model, client "
+                    "SELECT timestamp, api_type, path, status, duration, model "
                     "FROM recent_requests ORDER BY id DESC LIMIT 50"
                 )
                 rows = cursor.fetchall()
                 self._recent_requests = [
                     {"timestamp": r[0], "apiType": r[1], "path": r[2],
-                     "status": r[3], "duration": r[4], "model": r[5], "client": r[6] or ""}
+                     "status": r[3], "duration": r[4], "model": r[5]}
                     for r in reversed(rows)
                 ]
 
@@ -271,10 +256,10 @@ class PrometheusMetrics:
         try:
             with sqlite3.connect(self._db_path) as conn:
                 conn.execute(
-                    "INSERT INTO recent_requests (timestamp, api_type, path, status, duration, model, client) "
-                    "VALUES (?, ?, ?, ?, ?, ?, ?)",
+                    "INSERT INTO recent_requests (timestamp, api_type, path, status, duration, model) "
+                    "VALUES (?, ?, ?, ?, ?, ?)",
                     (req["timestamp"], req["apiType"], req["path"],
-                     req["status"], req["duration"], req["model"], req.get("client", ""))
+                     req["status"], req["duration"], req["model"])
                 )
                 # Keep only last 100 records
                 conn.execute(
@@ -407,8 +392,7 @@ class PrometheusMetrics:
         duration_ms: float,
         model: str = "unknown",
         is_stream: bool = False,
-        api_type: str = "openai",
-        client: str = ""
+        api_type: str = "openai"
     ) -> None:
         """
         Record a complete request with all Deno-compatible fields.
@@ -420,7 +404,6 @@ class PrometheusMetrics:
             model: Model name
             is_stream: Whether streaming request
             api_type: API type (openai/anthropic)
-            client: Client source (User-Agent)
         """
         with self._lock:
             # Increment stream/non-stream counters
@@ -448,8 +431,7 @@ class PrometheusMetrics:
                 "path": endpoint,
                 "status": status_code,
                 "duration": duration_ms,
-                "model": model,
-                "client": client
+                "model": model
             }
             self._recent_requests.append(req)
             if len(self._recent_requests) > self.MAX_RECENT_REQUESTS:
