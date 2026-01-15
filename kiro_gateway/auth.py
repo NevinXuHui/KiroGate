@@ -387,14 +387,25 @@ class KiroAuthManager:
 
     async def get_subscription_usage(self) -> Optional[dict]:
         """
-        Get subscription usage data from Kiro Q API.
+        Get subscription usage data from Kiro API.
+        
+        Tries Q API (GetSubscriptionUsage) first, falls back to CodeWhisperer API (getUsageLimits).
 
         Returns:
             Usage data dict containing usageBreakdownList, subscriptionInfo, etc.
             Returns None on error.
-        
-        Note: This API may not be available for all account types.
         """
+        # Try Q API first
+        result = await self._get_subscription_usage_q_api()
+        if result:
+            return result
+        
+        # Fallback to CodeWhisperer API
+        logger.info("Q API not available, trying CodeWhisperer API")
+        return await self._get_usage_limits_codewhisperer()
+
+    async def _get_subscription_usage_q_api(self) -> Optional[dict]:
+        """Get subscription usage from Q API (GetSubscriptionUsage)."""
         try:
             token = await self.get_access_token()
             
@@ -426,5 +437,47 @@ class KiroAuthManager:
                     return None
 
         except Exception as e:
-            logger.error(f"Error getting subscription usage: {e}", exc_info=True)
+            logger.error(f"Error getting subscription usage (Q API): {e}", exc_info=True)
+            return None
+
+    async def _get_usage_limits_codewhisperer(self) -> Optional[dict]:
+        """Get usage limits from CodeWhisperer API (getUsageLimits)."""
+        try:
+            token = await self.get_access_token()
+            
+            url = "https://codewhisperer.us-east-1.amazonaws.com/getUsageLimits"
+            params = {
+                "isEmailRequired": "true",
+                "origin": "AI_EDITOR",
+                "resourceType": "AGENTIC_REQUEST"
+            }
+            
+            kiro_version = "0.6.18"
+            x_amz_user_agent = f"aws-sdk-js/1.0.0 KiroIDE-{kiro_version}-{self._fingerprint}"
+            user_agent = f"aws-sdk-js/1.0.0 ua/2.1 os/linux lang/js md/nodejs#20.16.0 api/codewhispererruntime#1.0.0 m/E KiroIDE-{kiro_version}-{self._fingerprint}"
+            
+            headers = {
+                "Authorization": f"Bearer {token}",
+                "x-amz-user-agent": x_amz_user_agent,
+                "user-agent": user_agent,
+                "amz-sdk-invocation-id": str(__import__('uuid').uuid4()),
+                "amz-sdk-request": "attempt=1; max=1",
+                "Connection": "close"
+            }
+            
+            logger.debug(f"getUsageLimits request: url={url}")
+
+            async with httpx.AsyncClient(timeout=30) as client:
+                response = await client.get(url, headers=headers, params=params)
+
+                if response.status_code == 200:
+                    data = response.json()
+                    logger.debug(f"getUsageLimits success: {list(data.keys()) if data else 'empty'}")
+                    return data
+                else:
+                    logger.warning(f"getUsageLimits failed: HTTP {response.status_code}, body={response.text[:200]}")
+                    return None
+
+        except Exception as e:
+            logger.error(f"Error getting usage limits (CodeWhisperer API): {e}", exc_info=True)
             return None

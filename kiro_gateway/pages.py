@@ -1057,7 +1057,7 @@ def render_docs_page() -> str:
     {{
       "model_display_name": "kiro opus 4.5",
       "model": "claude-opus-4-5-think",
-      "base_url": "http://hh:8000",
+      "base_url": "http://118.31.36.236:8000",
       "api_key": "sk-3117eba9028e3455ecaa90a3463769adddb965f39d53d72a",
       "provider": "anthropic",
       "supports_vision": true,
@@ -1086,11 +1086,11 @@ def render_docs_page() -> str:
           <p class="text-sm" style="color: var(--text-muted);">在终端中设置环境变量：</p>
           <pre class="p-4 rounded-lg overflow-x-auto text-sm">
 # 设置 API 提供商为 Anthropic
-export ANTHROPIC_BASE_URL="http://hh:8000"
+export ANTHROPIC_BASE_URL="http://118.31.36.236:8000"
 export ANTHROPIC_API_KEY="sk-3117eba9028e3455ecaa90a3463769adddb965f39d53d72a"
 
 # 或者添加到 ~/.bashrc 或 ~/.zshrc 永久生效
-echo 'export ANTHROPIC_BASE_URL="http://hh:8000"' >> ~/.bashrc
+echo 'export ANTHROPIC_BASE_URL="http://118.31.36.236:8000"' >> ~/.bashrc
 echo 'export ANTHROPIC_API_KEY="sk-3117eba9028e3455ecaa90a3463769adddb965f39d53d72a"' >> ~/.bashrc</pre>
         </div>
 
@@ -1102,11 +1102,11 @@ echo 'export ANTHROPIC_API_KEY="sk-3117eba9028e3455ecaa90a3463769adddb965f39d53d
           <p class="text-sm" style="color: var(--text-muted);">在终端中设置环境变量：</p>
           <pre class="p-4 rounded-lg overflow-x-auto text-sm">
 # 设置 OpenAI 兼容端点
-export OPENAI_BASE_URL="http://hh:8000/v1"
+export OPENAI_BASE_URL="http://118.31.36.236:8000/v1"
 export OPENAI_API_KEY="sk-3117eba9028e3455ecaa90a3463769adddb965f39d53d72a"
 
 # 或者添加到 ~/.bashrc 或 ~/.zshrc 永久生效
-echo 'export OPENAI_BASE_URL="http://hh:8000/v1"' >> ~/.bashrc
+echo 'export OPENAI_BASE_URL="http://118.31.36.236:8000/v1"' >> ~/.bashrc
 echo 'export OPENAI_API_KEY="sk-3117eba9028e3455ecaa90a3463769adddb965f39d53d72a"' >> ~/.bashrc</pre>
         </div>
       </section>
@@ -5098,8 +5098,20 @@ def render_user_page(user) -> str:
         const list = data.usageBreakdownList || [];
         if (!list.length) return '<span class="text-gray-400">-</span>';
         const item = list[0];
-        const used = item.currentUsage || 0;
-        const limit = item.usageLimit || 0;
+        // 兼容 Q API (currentUsage) 和 CodeWhisperer API (currentUsageWithPrecision)
+        const mainUsed = item.currentUsage ?? item.currentUsageWithPrecision ?? 0;
+        const mainLimit = item.usageLimit ?? item.usageLimitWithPrecision ?? 0;
+        // 计算试用配额
+        const freeTrialInfo = item.freeTrialInfo || {{}};
+        const trialUsed = freeTrialInfo.currentUsage ?? freeTrialInfo.currentUsageWithPrecision ?? 0;
+        const trialLimit = freeTrialInfo.usageLimit ?? freeTrialInfo.usageLimitWithPrecision ?? 0;
+        // 计算奖励配额
+        const bonuses = item.bonuses || [];
+        const bonusUsed = bonuses.reduce((sum, b) => sum + (b.currentUsage ?? b.current_usage ?? 0), 0);
+        const bonusLimit = bonuses.reduce((sum, b) => sum + (b.usageLimit ?? b.usage_limit ?? 0), 0);
+        // 总计
+        const used = Math.round(mainUsed + trialUsed + bonusUsed);
+        const limit = Math.round(mainLimit + trialLimit + bonusLimit);
         const pct = limit > 0 ? Math.round((used / limit) * 100) : 0;
         const color = pct >= 90 ? 'text-red-400' : pct >= 70 ? 'text-amber-400' : 'text-green-400';
         return `<span class="${{color}}">${{used}}/${{limit}}</span>`;
