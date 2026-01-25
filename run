@@ -1,0 +1,67 @@
+#!/bin/bash
+# KiroGate 通用启动器 - 自动检测系统并选择合适的脚本
+# Universal launcher for KiroGate - Auto-detects system and runs appropriate script
+
+set -e
+
+# 检测操作系统
+detect_os() {
+    if [[ "$OSTYPE" == "linux-gnu"* ]]; then
+        echo "linux"
+    elif [[ "$OSTYPE" == "darwin"* ]]; then
+        echo "macos"
+    elif [[ "$OSTYPE" == "cygwin" ]] || [[ "$OSTYPE" == "msys" ]] || [[ "$OSTYPE" == "win32" ]]; then
+        echo "windows"
+    else
+        echo "unknown"
+    fi
+}
+
+# 检测可用的 shell
+detect_shell() {
+    if command -v pwsh &> /dev/null; then
+        echo "powershell"
+    elif command -v bash &> /dev/null; then
+        echo "bash"
+    else
+        echo "none"
+    fi
+}
+
+OS=$(detect_os)
+SHELL_TYPE=$(detect_shell)
+
+echo "🔍 检测到操作系统: $OS"
+echo "🐚 可用 Shell: $SHELL_TYPE"
+echo ""
+
+# 根据系统选择合适的脚本
+case "$OS" in
+    linux|macos)
+        if [ -f "run.sh" ]; then
+            echo "✅ 使用 run.sh 启动..."
+            chmod +x run.sh 2>/dev/null || true
+            exec ./run.sh "$@"
+        else
+            echo "❌ 错误: 未找到 run.sh"
+            exit 1
+        fi
+        ;;
+    windows)
+        if [ -f "run.sh" ]; then
+            echo "✅ 使用 run.sh 启动 (Git Bash)..."
+            chmod +x run.sh 2>/dev/null || true
+            exec ./run.sh "$@"
+        elif command -v cmd.exe &> /dev/null && [ -f "run.bat" ]; then
+            echo "✅ 使用 run.bat 启动..."
+            cmd.exe /c "run.bat $*"
+        else
+            echo "❌ 错误: 未找到合适的启动脚本"
+            exit 1
+        fi
+        ;;
+    *)
+        echo "❌ 错误: 不支持的操作系统"
+        exit 1
+        ;;
+esac
