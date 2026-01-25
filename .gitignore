@@ -17,6 +17,14 @@ __pycache__/
 dist/
 build/
 
+# Virtual environments
+venv/
+env/
+ENV/
+.venv/
+.env/
+virtualenv/
+
 # Debug logs (generated when DEBUG_LAST_REQUEST=true)
 debug_logs*/
 debug*.json

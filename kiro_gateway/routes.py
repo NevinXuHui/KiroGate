@@ -2999,11 +2999,18 @@ async def user_refresh_token_usage(
     if not refresh_token:
         return JSONResponse(status_code=500, content={"error": "无法解密 Token"})
 
+    # 获取完整的 token 凭证（包括 client_id 和 client_secret）
+    token_creds = user_db.get_token_credentials(token_id)
+    if not token_creds:
+        return JSONResponse(status_code=500, content={"error": "无法获取 Token 凭证"})
+
     try:
         temp_manager = KiroAuthManager(
-            refresh_token=refresh_token,
+            refresh_token=token_creds["refresh_token"],
             region=cfg.region,
-            profile_arn=cfg.profile_arn
+            profile_arn=cfg.profile_arn,
+            client_id=token_creds.get("client_id"),
+            client_secret=token_creds.get("client_secret")
         )
         # 先获取 access token 验证 refresh token 是否有效
         try:

@@ -135,7 +135,7 @@ class Settings(BaseSettings):
 
     # 强制使用指定模型（覆盖客户端请求的模型）
     # 留空表示不强制，使用客户端请求的模型
-    force_model: str = Field(default="", alias="FORCE_MODEL")
+    force_model: str = Field(default="claude-sonnet-4-5", alias="FORCE_MODEL")
 
     # 默认最大输入 token 数
     default_max_input_tokens: int = Field(default=200000)

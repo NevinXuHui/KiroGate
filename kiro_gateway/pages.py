@@ -4635,6 +4635,17 @@ def render_user_page(user) -> str:
         <p class="text-xs mt-1" style="color: var(--text-muted);">支持 Kiro Account Manager 导出的 JSON 文件</p>
       </div>
 
+      <!-- 匿名选项（仅公开模式显示） -->
+      <div id="anonymousOption" class="mb-4 p-3 rounded-lg public-only" style="background: var(--bg-input); border: 1px solid var(--border); display: none;">
+        <label class="flex items-center gap-2 cursor-pointer">
+          <input type="checkbox" id="donateAnonymous" class="w-4 h-4 rounded">
+          <div class="text-sm">
+            <span class="font-medium">匿名贡献</span>
+            <p class="text-xs mt-0.5" style="color: var(--text-muted);">不显示您的用户名</p>
+          </div>
+        </label>
+      </div>
+
       <input type="hidden" id="donateVisibility" value="private">
 
       <div class="flex justify-end gap-2 mt-4">
@@ -5596,7 +5607,8 @@ def render_user_page(user) -> str:
       }} else {{
         fd.append('tokens_text', tokensText);
       }}
-      fd.append('visibility', 'private');
+      fd.append('visibility', visibility);
+      if (visibility === 'public' && anonymous) fd.append('anonymous', 'true');
 
       // 提交
       try {{

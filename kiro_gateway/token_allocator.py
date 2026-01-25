@@ -210,15 +210,17 @@ class SmartTokenAllocator:
             if token.id in self._token_managers:
                 return self._token_managers[token.id]
 
-            # 获取解密的 refresh token
-            refresh_token = user_db.get_decrypted_token(token.id)
-            if not refresh_token:
-                raise NoTokenAvailable(f"Failed to decrypt token {token.id}")
+            # 获取完整的 token 凭证（包括 client_id 和 client_secret）
+            token_creds = user_db.get_token_credentials(token.id)
+            if not token_creds:
+                raise NoTokenAvailable(f"Failed to get credentials for token {token.id}")
 
             manager = KiroAuthManager(
-                refresh_token=refresh_token,
+                refresh_token=token_creds["refresh_token"],
                 region=settings.region,
-                profile_arn=settings.profile_arn
+                profile_arn=settings.profile_arn,
+                client_id=token_creds.get("client_id"),
+                client_secret=token_creds.get("client_secret")
             )
 
             self._token_managers[token.id] = manager
