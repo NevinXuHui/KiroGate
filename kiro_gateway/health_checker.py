@@ -125,18 +125,26 @@ class TokenHealthChecker:
         Returns:
             True if token is valid, False otherwise
         """
-        # Get decrypted token
-        refresh_token = user_db.get_decrypted_token(token_id)
+        # Get complete token credentials (including IDC credentials if applicable)
+        credentials = user_db.get_token_credentials(token_id)
+        if not credentials:
+            user_db.record_health_check(token_id, False, "Failed to get token credentials")
+            return False
+
+        refresh_token = credentials.get("refresh_token")
         if not refresh_token:
             user_db.record_health_check(token_id, False, "Failed to decrypt token")
             return False
 
         # Try to get access token
         try:
+            # Create manager with complete credentials (supports both Social and IDC modes)
             manager = KiroAuthManager(
                 refresh_token=refresh_token,
                 region=settings.region,
-                profile_arn=settings.profile_arn
+                profile_arn=settings.profile_arn,
+                client_id=credentials.get("client_id"),
+                client_secret=credentials.get("client_secret")
             )
             access_token = await manager.get_access_token()
 

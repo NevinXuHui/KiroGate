@@ -93,12 +93,12 @@ create_dirs() {
 # 启动服务
 start_service() {
     print_info "启动 KiroGate 服务..."
-    print_info "访问地址: http://localhost:8000"
+    print_info "访问地址: http://localhost:9000"
     print_info "按 Ctrl+C 停止服务"
     echo ""
-    
+
     # 使用 uvicorn 启动（main.py 在根目录）
-    python -m uvicorn main:app --host 0.0.0.0 --port 8000 --reload
+    python -m uvicorn main:app --host 0.0.0.0 --port 9000 --reload
 }
 
 # 主函数

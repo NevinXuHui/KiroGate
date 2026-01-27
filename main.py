@@ -23,7 +23,7 @@ KiroGate - OpenAI & Anthropic 兼容的 Kiro API 网关。
 应用程序入口点。创建 FastAPI 应用并连接路由。
 
 用法:
-    uvicorn main:app --host 0.0.0.0 --port 8000
+    uvicorn main:app --host 0.0.0.0 --port 9000
     或直接运行:
     python main.py
 """
@@ -141,11 +141,11 @@ def _print_startup_banner():
     logger.info("🚀 KiroGate 启动成功!")
     logger.info("=" * 60)
     logger.info("📍 项目地址:")
-    logger.info(f"   • 本地访问: http://127.0.0.1:8000")
-    logger.info(f"   • 网络访问: http://0.0.0.0:8000")
+    logger.info(f"   • 本地访问: http://127.0.0.1:9000")
+    logger.info(f"   • 网络访问: http://0.0.0.0:9000")
     logger.info("📖 API 文档:")
-    logger.info(f"   • Swagger UI: http://127.0.0.1:8000/docs")
-    logger.info(f"   • Admin 面板: http://127.0.0.1:8000/admin")
+    logger.info(f"   • Swagger UI: http://127.0.0.1:9000/docs")
+    logger.info(f"   • Admin 面板: http://127.0.0.1:9000/admin")
     logger.info("=" * 60)
 
 
@@ -358,6 +358,6 @@ if __name__ == "__main__":
     uvicorn.run(
         app,
         host="0.0.0.0",
-        port=8000,
+        port=9000,
         log_config=UVICORN_LOG_CONFIG,
     )
