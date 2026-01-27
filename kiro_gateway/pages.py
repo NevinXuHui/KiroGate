@@ -1021,7 +1021,14 @@ def render_home_page() -> str:
 
 
 def render_docs_page() -> str:
-    """Render the API documentation page."""
+    """Render the API documentation page with dynamic configuration."""
+    from kiro_gateway.config import settings
+
+    # 动态获取当前配置
+    api_key = settings.proxy_api_key
+    base_url = "http://localhost:9000"
+    base_url_v1 = f"{base_url}/v1"
+
     return f'''<!DOCTYPE html>
 <html lang="zh">
 <head>{COMMON_HEAD}</head>
@@ -1057,8 +1064,8 @@ def render_docs_page() -> str:
     {{
       "model_display_name": "kiro opus 4.5",
       "model": "claude-opus-4-5-think",
-      "base_url": "http://118.31.36.236:8000",
-      "api_key": "sk-3117eba9028e3455ecaa90a3463769adddb965f39d53d72a",
+      "base_url": "{base_url}",
+      "api_key": "{api_key}",
       "provider": "anthropic",
       "supports_vision": true,
       "max_tokens": 8192
@@ -1086,12 +1093,12 @@ def render_docs_page() -> str:
           <p class="text-sm" style="color: var(--text-muted);">在终端中设置环境变量：</p>
           <pre class="p-4 rounded-lg overflow-x-auto text-sm">
 # 设置 API 提供商为 Anthropic
-export ANTHROPIC_BASE_URL="http://118.31.36.236:8000"
-export ANTHROPIC_API_KEY="sk-3117eba9028e3455ecaa90a3463769adddb965f39d53d72a"
+export ANTHROPIC_BASE_URL="{base_url}"
+export ANTHROPIC_API_KEY="{api_key}"
 
 # 或者添加到 ~/.bashrc 或 ~/.zshrc 永久生效
-echo 'export ANTHROPIC_BASE_URL="http://118.31.36.236:8000"' >> ~/.bashrc
-echo 'export ANTHROPIC_API_KEY="sk-3117eba9028e3455ecaa90a3463769adddb965f39d53d72a"' >> ~/.bashrc</pre>
+echo 'export ANTHROPIC_BASE_URL="{base_url}"' >> ~/.bashrc
+echo 'export ANTHROPIC_API_KEY="{api_key}"' >> ~/.bashrc</pre>
         </div>
 
         <div class="mt-6 space-y-4">
@@ -1102,12 +1109,12 @@ echo 'export ANTHROPIC_API_KEY="sk-3117eba9028e3455ecaa90a3463769adddb965f39d53d
           <p class="text-sm" style="color: var(--text-muted);">在终端中设置环境变量：</p>
           <pre class="p-4 rounded-lg overflow-x-auto text-sm">
 # 设置 OpenAI 兼容端点
-export OPENAI_BASE_URL="http://118.31.36.236:8000/v1"
-export OPENAI_API_KEY="sk-3117eba9028e3455ecaa90a3463769adddb965f39d53d72a"
+export OPENAI_BASE_URL="{base_url_v1}"
+export OPENAI_API_KEY="{api_key}"
 
 # 或者添加到 ~/.bashrc 或 ~/.zshrc 永久生效
-echo 'export OPENAI_BASE_URL="http://118.31.36.236:8000/v1"' >> ~/.bashrc
-echo 'export OPENAI_API_KEY="sk-3117eba9028e3455ecaa90a3463769adddb965f39d53d72a"' >> ~/.bashrc</pre>
+echo 'export OPENAI_BASE_URL="{base_url_v1}"' >> ~/.bashrc
+echo 'export OPENAI_API_KEY="{api_key}"' >> ~/.bashrc</pre>
         </div>
       </section>
 

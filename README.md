@@ -67,13 +67,13 @@ cp .env.example .env
 python main.py
 ```
 
-服务器将在 `http://localhost:8000` 启动
+服务器将在 `http://localhost:9000` 启动
 
 ### Docker 部署
 
 ```bash
 # 方式一: 使用预构建镜像（推荐）
-docker run -d -p 8000:8000 \
+docker run -d -p 8000:9000 \
   -e PROXY_API_KEY="your-password" \
   -v kirogate_data:/app/data \
   --name kirogate \
@@ -86,7 +86,7 @@ docker-compose up -d
 
 # 方式三: 本地构建运行
 docker build -t kirogate .
-docker run -d -p 8000:8000 \
+docker run -d -p 8000:9000 \
   -e PROXY_API_KEY="your-password" \
   -v kirogate_data:/app/data \
   --name kirogate kirogate
@@ -169,7 +169,7 @@ fly volumes create kirogate_data --region nrt --size 1
 #### 手动 Docker 运行
 
 ```bash
-docker run -d -p 8000:8000 \
+docker run -d -p 8000:9000 \
   -v kirogate_data:/app/data \  # 关键：挂载数据卷
   -e PROXY_API_KEY="your-password" \
   --name kirogate kirogate
@@ -348,7 +348,7 @@ STATIC_ASSETS_PROXY_BASE="https://proxy.jhun.edu.kg"
 <summary>🔹 cURL 请求（简单模式）</summary>
 
 ```bash
-curl http://localhost:8000/v1/chat/completions \
+curl http://localhost:9000/v1/chat/completions \
   -H "Authorization: Bearer my-super-secret-password-123" \
   -H "Content-Type: application/json" \
   -d '{
@@ -364,7 +364,7 @@ curl http://localhost:8000/v1/chat/completions \
 <summary>🔹 cURL 请求（组合模式 - 推荐）</summary>
 
 ```bash
-curl http://localhost:8000/v1/chat/completions \
+curl http://localhost:9000/v1/chat/completions \
   -H "Authorization: Bearer my-proxy-key:eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..." \
   -H "Content-Type: application/json" \
   -d '{
@@ -383,7 +383,7 @@ curl http://localhost:8000/v1/chat/completions \
 from openai import OpenAI
 
 client = OpenAI(
-    base_url="http://localhost:8000/v1",
+    base_url="http://localhost:9000/v1",
     api_key="my-super-secret-password-123"  # 你的 PROXY_API_KEY
 )
 
@@ -411,7 +411,7 @@ from openai import OpenAI
 
 # 组合模式：PROXY_API_KEY:REFRESH_TOKEN
 client = OpenAI(
-    base_url="http://localhost:8000/v1",
+    base_url="http://localhost:9000/v1",
     api_key="my-proxy-key:eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
 )
 
@@ -438,7 +438,7 @@ for chunk in response:
 from langchain_openai import ChatOpenAI
 
 llm = ChatOpenAI(
-    base_url="http://localhost:8000/v1",
+    base_url="http://localhost:9000/v1",
     api_key="my-super-secret-password-123",
     model="claude-sonnet-4-5"
 )
@@ -458,11 +458,11 @@ print(response.content)
 
 ```bash
 # 设置环境变量
-export ANTHROPIC_BASE_URL="http://localhost:8000"
+export ANTHROPIC_BASE_URL="http://localhost:9000"
 export ANTHROPIC_API_KEY="my-super-secret-password-123"  # 你的 PROXY_API_KEY
 
 # 或者在 Claude Code 设置中配置
-claude config set --global apiBaseUrl "http://localhost:8000"
+claude config set --global apiBaseUrl "http://localhost:9000"
 ```
 
 </details>
@@ -474,11 +474,11 @@ claude config set --global apiBaseUrl "http://localhost:8000"
 
 ```bash
 # 设置环境变量（组合格式）
-export ANTHROPIC_BASE_URL="http://localhost:8000"
+export ANTHROPIC_BASE_URL="http://localhost:9000"
 export ANTHROPIC_API_KEY="my-proxy-key:eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
 
 # 或者在 Claude Code 设置中配置
-claude config set --global apiBaseUrl "http://localhost:8000"
+claude config set --global apiBaseUrl "http://localhost:9000"
 claude config set --global apiKey "my-proxy-key:eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
 ```
 
@@ -496,7 +496,7 @@ claude config set --global apiKey "my-proxy-key:eyJhbGciOiJIUzI1NiIsInR5cCI6IkpX
 from anthropic import Anthropic
 
 client = Anthropic(
-    base_url="http://localhost:8000",
+    base_url="http://localhost:9000",
     api_key="my-super-secret-password-123"  # 你的 PROXY_API_KEY
 )
 
@@ -530,7 +530,7 @@ from anthropic import Anthropic
 
 # 组合模式：PROXY_API_KEY:REFRESH_TOKEN
 client = Anthropic(
-    base_url="http://localhost:8000",
+    base_url="http://localhost:9000",
     api_key="my-proxy-key:eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
 )
 
@@ -560,7 +560,7 @@ with client.messages.stream(
 <summary>🔹 Anthropic cURL 请求（简单模式）</summary>
 
 ```bash
-curl http://localhost:8000/v1/messages \
+curl http://localhost:9000/v1/messages \
   -H "x-api-key: my-super-secret-password-123" \
   -H "anthropic-version: 2023-06-01" \
   -H "Content-Type: application/json" \
@@ -577,7 +577,7 @@ curl http://localhost:8000/v1/messages \
 <summary>🔹 Anthropic cURL 请求（组合模式 - 推荐）</summary>
 
 ```bash
-curl http://localhost:8000/v1/messages \
+curl http://localhost:9000/v1/messages \
   -H "x-api-key: my-proxy-key:eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..." \
   -H "anthropic-version: 2023-06-01" \
   -H "Content-Type: application/json" \
@@ -675,7 +675,7 @@ ADMIN_SESSION_MAX_AGE=86400
 ### Docker 部署
 
 ```bash
-docker run -d -p 8000:8000 \
+docker run -d -p 8000:9000 \
   -e PROXY_API_KEY="your-password" \
   -e ADMIN_PASSWORD="your-admin-password" \
   -e ADMIN_SECRET_KEY="your-random-secret" \
@@ -741,13 +741,13 @@ TOKEN_ENCRYPT_KEY="your-32-byte-encrypt-key-here!!"
 
 ```bash
 # OpenAI 格式
-curl http://localhost:8000/v1/chat/completions \
+curl http://localhost:9000/v1/chat/completions \
   -H "Authorization: Bearer sk-your-api-key" \
   -H "Content-Type: application/json" \
   -d '{"model": "claude-sonnet-4-5", "messages": [{"role": "user", "content": "你好"}]}'
 
 # Anthropic 格式
-curl http://localhost:8000/v1/messages \
+curl http://localhost:9000/v1/messages \
   -H "x-api-key: sk-your-api-key" \
   -H "Content-Type: application/json" \
   -d '{"model": "claude-sonnet-4-5", "max_tokens": 1024, "messages": [{"role": "user", "content": "你好"}]}'
