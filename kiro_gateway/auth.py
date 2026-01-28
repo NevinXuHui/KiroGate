@@ -545,58 +545,13 @@ class KiroAuthManager:
 
     async def get_subscription_usage(self) -> Optional[dict]:
         """
-        Get subscription usage data from Kiro API.
-        
-        Tries Q API (GetSubscriptionUsage) first, falls back to CodeWhisperer API (getUsageLimits).
+        Get subscription usage data from CodeWhisperer API.
 
         Returns:
             Usage data dict containing usageBreakdownList, subscriptionInfo, etc.
             Returns None on error.
         """
-        # Try Q API first
-        result = await self._get_subscription_usage_q_api()
-        if result:
-            return result
-        
-        # Fallback to CodeWhisperer API
-        logger.info("Q API not available, trying CodeWhisperer API")
         return await self._get_usage_limits_codewhisperer()
-
-    async def _get_subscription_usage_q_api(self) -> Optional[dict]:
-        """Get subscription usage from Q API (GetSubscriptionUsage)."""
-        try:
-            token = await self.get_access_token()
-            
-            if not self._profile_arn:
-                logger.warning("profile_arn is empty, GetSubscriptionUsage may fail")
-            
-            from kiro_gateway.utils import get_kiro_headers
-            headers = get_kiro_headers(self, token)
-
-            url = f"{self._q_host}/GetSubscriptionUsage"
-            params = {"origin": "AI_EDITOR"}
-            if self._profile_arn:
-                params["profileArn"] = self._profile_arn
-            
-            logger.debug(f"GetSubscriptionUsage request: url={url}, profileArn={self._profile_arn}")
-
-            async with httpx.AsyncClient(timeout=30) as client:
-                response = await client.get(url, headers=headers, params=params)
-
-                if response.status_code == 200:
-                    data = response.json()
-                    logger.debug(f"GetSubscriptionUsage success: {list(data.keys()) if data else 'empty'}")
-                    return data
-                elif response.status_code == 404:
-                    logger.info("GetSubscriptionUsage API not available (404)")
-                    return None
-                else:
-                    logger.warning(f"GetSubscriptionUsage failed: HTTP {response.status_code}, body={response.text[:200]}")
-                    return None
-
-        except Exception as e:
-            logger.error(f"Error getting subscription usage (Q API): {e}", exc_info=True)
-            return None
 
     async def _get_usage_limits_codewhisperer(self) -> Optional[dict]:
         """Get usage limits from CodeWhisperer API (getUsageLimits)."""
