@@ -596,8 +596,8 @@ COMMON_NAV = r'''
             <a href="/" class="nav-link">首页</a>
             <a href="/docs" class="nav-link">文档</a>
             <a href="/swagger" class="nav-link">接口</a>
-            <a href="/playground" class="nav-link">测试</a>
-            <a href="/dashboard" class="nav-link">面板</a>
+            <a href="/playground" class="nav-link auth-required" style="display: none;">测试</a>
+            <a href="/dashboard" class="nav-link auth-required" style="display: none;">面板</a>
           </div>
         </div>
         <div class="flex items-center space-x-3">
@@ -635,8 +635,8 @@ COMMON_NAV = r'''
         <a href="/" class="block nav-link py-2.5 px-4 rounded-lg hover:bg-indigo-500/10 transition-colors">首页</a>
         <a href="/docs" class="block nav-link py-2.5 px-4 rounded-lg hover:bg-indigo-500/10 transition-colors">文档</a>
         <a href="/swagger" class="block nav-link py-2.5 px-4 rounded-lg hover:bg-indigo-500/10 transition-colors">接口</a>
-        <a href="/playground" class="block nav-link py-2.5 px-4 rounded-lg hover:bg-indigo-500/10 transition-colors">测试</a>
-        <a href="/dashboard" class="block nav-link py-2.5 px-4 rounded-lg hover:bg-indigo-500/10 transition-colors">面板</a>
+        <a href="/playground" class="block nav-link py-2.5 px-4 rounded-lg hover:bg-indigo-500/10 transition-colors auth-required" style="display: none;">测试</a>
+        <a href="/dashboard" class="block nav-link py-2.5 px-4 rounded-lg hover:bg-indigo-500/10 transition-colors auth-required" style="display: none;">面板</a>
         <div id="mobile-auth-area" class="pt-3 mt-3" style="border-top: 1px solid var(--border);">
           <a href="/login" class="block py-2.5 px-4 rounded-lg text-center font-medium btn-primary">登录</a>
         </div>
@@ -810,6 +810,10 @@ COMMON_NAV = r'''
               <span>${{safeName || '用户中心'}}</span>
             </a>`;
           }}
+          // 显示需要登录的链接
+          document.querySelectorAll('.auth-required').forEach(el => {{
+            el.style.display = '';
+          }});
         }}
       }} catch {{}} finally {{
         loadAnnouncement();
@@ -1048,11 +1052,42 @@ def render_docs_page() -> str:
           <h2 class="text-2xl font-semibold">Factory 配置</h2>
         </div>
         <p style="color: var(--text-muted);" class="mb-4">将以下配置保存到 <code class="px-1.5 py-0.5 rounded" style="background: var(--bg-input);">~/factory/config.json</code> 文件中：</p>
-        <pre class="p-4 rounded-lg overflow-x-auto text-sm">{{
+        <div class="relative">
+          <pre class="p-4 rounded-lg overflow-x-auto text-sm" data-code="{{
+  &quot;custom_models&quot;: [
+    {{
+      &quot;model_display_name&quot;: &quot;Opus 4.5 [duojie.games]&quot;,
+      &quot;model&quot;: &quot;claude-opus-4-5-20251101&quot;,
+      &quot;base_url&quot;: &quot;https://api.duojie.games&quot;,
+      &quot;api_key&quot;: &quot;***************************************************&quot;,
+      &quot;provider&quot;: &quot;anthropic&quot;,
+      &quot;supports_vision&quot;: true,
+      &quot;max_tokens&quot;: 8192
+    }},
+    {{
+      &quot;model_display_name&quot;: &quot;kiro opus 4.5&quot;,
+      &quot;model&quot;: &quot;claude-opus-4-5-think&quot;,
+      &quot;base_url&quot;: &quot;{base_url}&quot;,
+      &quot;api_key&quot;: &quot;{api_key}&quot;,
+      &quot;provider&quot;: &quot;anthropic&quot;,
+      &quot;supports_vision&quot;: true,
+      &quot;max_tokens&quot;: 8192
+    }}
+  ]
+}}">{{
   "custom_models": [
     {{
-      "model_display_name": "KiroGate Claude",
-      "model": "claude-sonnet-4-5",
+      "model_display_name": "Opus 4.5 [duojie.games]",
+      "model": "claude-opus-4-5-20251101",
+      "base_url": "https://api.duojie.games",
+      "api_key": "***************************************************",
+      "provider": "anthropic",
+      "supports_vision": true,
+      "max_tokens": 8192
+    }},
+    {{
+      "model_display_name": "kiro opus 4.5",
+      "model": "claude-opus-4-5-think",
       "base_url": "{base_url}",
       "api_key": "{api_key}",
       "provider": "anthropic",
@@ -1061,6 +1096,11 @@ def render_docs_page() -> str:
     }}
   ]
 }}</pre>
+          <button onclick="copyCode(this)" class="absolute top-2 right-2 px-3 py-1.5 text-xs rounded-lg transition-all" style="background: var(--bg-input); border: 1px solid var(--border); color: var(--text);" title="复制代码">
+            <span class="copy-icon">📋</span>
+            <span class="copy-text">复制</span>
+          </button>
+        </div>
         <div class="mt-4 p-4 rounded-xl" style="background: linear-gradient(135deg, rgba(99, 102, 241, 0.1), rgba(139, 92, 246, 0.1)); border: 1px solid rgba(99, 102, 241, 0.2);">
           <p class="text-sm font-semibold mb-2" style="color: var(--text);">💡 配置说明</p>
           <ul class="text-sm space-y-1.5" style="color: var(--text-muted);">
@@ -1213,8 +1253,22 @@ x-api-key: YOUR_PROXY_API_KEY</pre>
               <span class="w-6 h-6 rounded bg-yellow-500/20 text-yellow-400 flex items-center justify-center text-xs">🐍</span>
               OpenAI SDK (Python)
             </h3>
-            <pre class="p-4 rounded-lg overflow-x-auto text-sm">
-from openai import OpenAI
+            <div class="relative">
+              <pre class="p-4 rounded-lg overflow-x-auto text-sm" data-code="from openai import OpenAI
+
+client = OpenAI(
+    base_url=&quot;http://localhost:8000/v1&quot;,
+    api_key=&quot;YOUR_PROXY_API_KEY&quot;
+)
+
+response = client.chat.completions.create(
+    model=&quot;claude-sonnet-4-5&quot;,
+    messages=[{{&quot;role&quot;: &quot;user&quot;, &quot;content&quot;: &quot;Hello!&quot;}}],
+    stream=True
+)
+
+for chunk in response:
+    print(chunk.choices[0].delta.content, end=&quot;&quot;)">from openai import OpenAI
 
 client = OpenAI(
     base_url="http://localhost:8000/v1",
@@ -1229,6 +1283,11 @@ response = client.chat.completions.create(
 
 for chunk in response:
     print(chunk.choices[0].delta.content, end="")</pre>
+              <button onclick="copyCode(this)" class="absolute top-2 right-2 px-3 py-1.5 text-xs rounded-lg transition-all" style="background: var(--bg-input); border: 1px solid var(--border); color: var(--text);" title="复制代码">
+                <span class="copy-icon">📋</span>
+                <span class="copy-text">复制</span>
+              </button>
+            </div>
           </div>
 
           <div>
@@ -1236,8 +1295,21 @@ for chunk in response:
               <span class="w-6 h-6 rounded bg-purple-500/20 text-purple-400 flex items-center justify-center text-xs">🤖</span>
               Anthropic SDK (Python)
             </h3>
-            <pre class="p-4 rounded-lg overflow-x-auto text-sm">
-import anthropic
+            <div class="relative">
+              <pre class="p-4 rounded-lg overflow-x-auto text-sm" data-code="import anthropic
+
+client = anthropic.Anthropic(
+    base_url=&quot;http://localhost:8000&quot;,
+    api_key=&quot;YOUR_PROXY_API_KEY&quot;
+)
+
+message = client.messages.create(
+    model=&quot;claude-sonnet-4-5&quot;,
+    max_tokens=1024,
+    messages=[{{&quot;role&quot;: &quot;user&quot;, &quot;content&quot;: &quot;Hello!&quot;}}]
+)
+
+print(message.content[0].text)">import anthropic
 
 client = anthropic.Anthropic(
     base_url="http://localhost:8000",
@@ -1251,6 +1323,11 @@ message = client.messages.create(
 )
 
 print(message.content[0].text)</pre>
+              <button onclick="copyCode(this)" class="absolute top-2 right-2 px-3 py-1.5 text-xs rounded-lg transition-all" style="background: var(--bg-input); border: 1px solid var(--border); color: var(--text);" title="复制代码">
+                <span class="copy-icon">📋</span>
+                <span class="copy-text">复制</span>
+              </button>
+            </div>
           </div>
 
           <div>
@@ -1258,14 +1335,25 @@ print(message.content[0].text)</pre>
               <span class="w-6 h-6 rounded bg-green-500/20 text-green-400 flex items-center justify-center text-xs">$</span>
               cURL
             </h3>
-            <pre class="p-4 rounded-lg overflow-x-auto text-sm">
-curl http://localhost:8000/v1/chat/completions \\
+            <div class="relative">
+              <pre class="p-4 rounded-lg overflow-x-auto text-sm" data-code="curl http://localhost:8000/v1/chat/completions \
+  -H &quot;Authorization: Bearer YOUR_PROXY_API_KEY&quot; \
+  -H &quot;Content-Type: application/json&quot; \
+  -d '{
+    &quot;model&quot;: &quot;claude-sonnet-4-5&quot;,
+    &quot;messages&quot;: [{{&quot;role&quot;: &quot;user&quot;, &quot;content&quot;: &quot;Hello!&quot;}}]
+  }'">curl http://localhost:8000/v1/chat/completions \\
   -H "Authorization: Bearer YOUR_PROXY_API_KEY" \\
   -H "Content-Type: application/json" \\
   -d '{{
     "model": "claude-sonnet-4-5",
     "messages": [{{"role": "user", "content": "Hello!"}}]
   }}'</pre>
+              <button onclick="copyCode(this)" class="absolute top-2 right-2 px-3 py-1.5 text-xs rounded-lg transition-all" style="background: var(--bg-input); border: 1px solid var(--border); color: var(--text);" title="复制代码">
+                <span class="copy-icon">📋</span>
+                <span class="copy-text">复制</span>
+              </button>
+            </div>
           </div>
         </div>
       </section>
