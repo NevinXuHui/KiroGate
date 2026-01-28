@@ -32,9 +32,10 @@
 | **自动重试** | 遇到错误时自动重试 (403, 429, 5xx) |
 | **多模型支持** | 支持多种 Claude 模型版本 |
 | **智能 Token 管理** | 自动在过期前刷新凭证 |
-| **用户系统** | 支持 LinuxDo/GitHub OAuth2 登录 |
+| **用户系统** | 支持密码注册/登录、LinuxDo/GitHub OAuth2 登录 |
 | **Token 捐献** | 用户可捐献 Token 共享使用 |
-| **API Key 生成** | 生成 sk-xxx 格式的 API Key |
+| **API Key 生成** | 生成 sk-xxx 格式的 API Key，支持超级 API Key |
+| **超级 API Key** | 管理员可创建超级 API Key，访问所有公共 Token 池 |
 | **Admin 管理后台** | 用户管理、Token 池管理、IP 黑名单等 |
 | **中文日志系统** | 完整的中文日志输出，含时间戳和用户信息 |
 | **数据持久化** | 支持 Docker 卷和 Fly.io 持久卷 |
@@ -650,7 +651,7 @@ KiroGate 提供了一个隐藏的管理后台，用于监控和管理服务。
 | 功能 | 说明 |
 |------|------|
 | 📊 **概览面板** | 站点状态、Token 状态、总请求数、成功率、平均延迟 |
-| 👥 **用户管理** | 查看所有用户、搜索/排序/分页、封禁/解封用户 |
+| 👥 **用户管理** | 查看所有用户、搜索/排序/分页、封禁/解封用户、创建超级 API Key |
 | 🎁 **Token 池管理** | 管理捐献的 Token、切换可见性、查看成功率 |
 | 🌐 **IP 统计** | 请求来源 IP、请求次数、最后访问时间 |
 | 🚫 **黑名单管理** | 封禁/解封 IP 地址 |
@@ -691,32 +692,45 @@ KiroGate 支持用户注册登录，用户可以捐献 Token 并生成自己的 
 
 ### 登录方式
 
-支持两种 OAuth2 登录方式：
+支持三种登录方式：
 
 | 提供商 | 配置 | 获取地址 |
 |--------|------|----------|
+| **密码登录** | 无需配置，开箱即用 | - |
 | **LinuxDo** | `OAUTH_CLIENT_ID`, `OAUTH_CLIENT_SECRET` | https://connect.linux.do |
 | **GitHub** | `GITHUB_CLIENT_ID`, `GITHUB_CLIENT_SECRET` | https://github.com/settings/developers |
+
+#### 密码登录
+
+用户可以使用邮箱和密码注册/登录，无需配置 OAuth2：
+
+- 📧 **邮箱注册**：使用邮箱和密码创建账号
+- 🔐 **安全加密**：密码使用 bcrypt 加密存储
+- ✅ **开箱即用**：无需额外配置，默认启用
 
 ### 功能说明
 
 | 功能 | 说明 |
 |------|------|
-| 🔐 **多方式登录** | 支持 LinuxDo 和 GitHub OAuth2 登录 |
+| 🔐 **多方式登录** | 支持密码登录、LinuxDo 和 GitHub OAuth2 登录 |
 | 🎁 **Token 捐献** | 用户可捐献 Refresh Token，选择公开或私有 |
 | 🔑 **API Key 生成** | 生成 `sk-xxx` 格式的 API Key |
+| ⚡ **超级 API Key** | 管理员可创建超级 API Key，访问所有公共 Token |
 | 📊 **使用统计** | 查看 Token 成功率和使用次数 |
 | 🌐 **公开 Token 池** | 公开的 Token 供所有用户共享使用 |
 
 ### 配置示例
 
 ```env
-# LinuxDo OAuth2
+# 密码登录（默认启用，无需配置）
+# 密码使用 bcrypt 加密存储
+
+# LinuxDo OAuth2（可选）
 OAUTH_CLIENT_ID="your-linuxdo-client-id"
 OAUTH_CLIENT_SECRET="your-linuxdo-client-secret"
 OAUTH_REDIRECT_URI="https://your-domain.com/oauth2/callback"
 
-# GitHub OAuth2
+# GitHub OAuth2（可选）
 GITHUB_CLIENT_ID="your-github-client-id"
 GITHUB_CLIENT_SECRET="your-github-client-secret"
 GITHUB_REDIRECT_URI="https://your-domain.com/oauth2/github/callback"
@@ -730,10 +744,57 @@ TOKEN_ENCRYPT_KEY="your-32-byte-encrypt-key-here!!"
 
 | 端点 | 说明 |
 |------|------|
-| `/login` | 登录选择页面 |
+| `/login` | 登录选择页面（密码登录/OAuth2） |
+| `/register` | 密码注册页面 |
 | `/user` | 用户中心（Token 管理、API Key 管理） |
 | `/tokens` | 公开 Token 池 |
 | `/oauth2/logout` | 退出登录 |
+
+### 超级 API Key
+
+超级 API Key 是一种特殊的 API Key，由管理员创建，具有以下特性：
+
+#### 特性说明
+
+| 特性 | 说明 |
+|------|------|
+| 🌐 **访问所有公共 Token** | 可以使用所有用户捐献的公共 Token，不限于自己的 Token |
+| 🎯 **智能分配** | 自动选择最佳可用的公共 Token（基于成功率和使用次数） |
+| 📊 **独立统计** | 使用记录独立追踪，不影响普通用户 |
+| 🔒 **管理员专属** | 只能由管理员通过后台创建 |
+
+#### 创建方式
+
+管理员登录后台后，在用户管理页面可以为任意用户创建超级 API Key：
+
+1. 访问 `/admin` 管理后台
+2. 进入"用户管理"页面
+3. 找到目标用户，点击"创建超级 API Key"
+4. 系统生成 `sk-super-xxx` 格式的 API Key
+
+#### 使用示例
+
+超级 API Key 的使用方式与普通 API Key 完全相同：
+
+```bash
+# OpenAI 格式
+curl http://localhost:9000/v1/chat/completions \
+  -H "Authorization: Bearer sk-super-xxx" \
+  -H "Content-Type: application/json" \
+  -d '{"model": "claude-sonnet-4-5", "messages": [{"role": "user", "content": "你好"}]}'
+
+# Anthropic 格式
+curl http://localhost:9000/v1/messages \
+  -H "x-api-key: sk-super-xxx" \
+  -H "Content-Type: application/json" \
+  -d '{"model": "claude-sonnet-4-5", "max_tokens": 1024, "messages": [{"role": "user", "content": "你好"}]}'
+```
+
+#### 使用场景
+
+- 🏢 **企业部署**：为内部服务创建统一的 API Key，访问共享 Token 池
+- 🤖 **机器人服务**：为聊天机器人等自动化服务提供稳定的 Token 访问
+- 🔧 **开发测试**：快速测试所有公共 Token 的可用性
 
 ### 使用 API Key
 

@@ -25,6 +25,7 @@ HTTP 客户端管理器。
 """
 
 import asyncio
+import os
 from typing import Optional
 
 import httpx
@@ -66,11 +67,26 @@ class GlobalHTTPClientManager:
                     keepalive_expiry=60.0  # Increased from 30.0 for long-running connections
                 )
 
+                # Fix proxy URL: convert socks5h:// to socks5://
+                # httpx doesn't support socks5h:// (SOCKS5 with remote DNS resolution)
+                proxies = None
+                for env_var in ['ALL_PROXY', 'all_proxy', 'HTTPS_PROXY', 'https_proxy', 'HTTP_PROXY', 'http_proxy']:
+                    proxy_url = os.environ.get(env_var)
+                    if proxy_url and 'socks5h://' in proxy_url:
+                        fixed_proxy = proxy_url.replace('socks5h://', 'socks5://')
+                        proxies = {
+                            'http://': fixed_proxy,
+                            'https://': fixed_proxy
+                        }
+                        logger.debug(f"Fixed proxy URL: {proxy_url} -> {fixed_proxy}")
+                        break
+
                 self._client = httpx.AsyncClient(
                     timeout=None,  # Timeout set per-request
                     follow_redirects=True,
                     limits=limits,
-                    http2=False
+                    http2=False,
+                    proxies=proxies
                 )
                 logger.debug("Created new global HTTP client with connection pool")
 

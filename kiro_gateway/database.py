@@ -85,6 +85,7 @@ class APIKey:
     key_prefix: str
     name: Optional[str]
     is_active: bool
+    is_super: bool  # 超级 API Key 可以访问所有用户的 Token
     request_count: int
     last_used: Optional[int]
     created_at: int
@@ -319,6 +320,12 @@ class UserDatabase:
             if "usage_data" not in columns:
                 conn.execute(
                     "ALTER TABLE tokens ADD COLUMN usage_data TEXT"
+                )
+
+            # Add is_super column to api_keys table if not exists
+            if "is_super" not in api_keys_columns:
+                conn.execute(
+                    "ALTER TABLE api_keys ADD COLUMN is_super INTEGER DEFAULT 0"
                 )
 
             # Create email index after migration (if email column exists)
@@ -1322,9 +1329,14 @@ class UserDatabase:
 
     # ==================== API Key Methods ====================
 
-    def generate_api_key(self, user_id: int, name: Optional[str] = None) -> Tuple[str, APIKey]:
+    def generate_api_key(self, user_id: int, name: Optional[str] = None, is_super: bool = False) -> Tuple[str, APIKey]:
         """
         Generate a new API key for user.
+
+        Args:
+            user_id: User ID
+            name: Optional key name
+            is_super: Whether this is a super API key (can access all tokens)
 
         Returns:
             (plain_key, APIKey object) - plain_key is only returned once!
@@ -1340,9 +1352,9 @@ class UserDatabase:
         with self._lock:
             with self._get_conn() as conn:
                 cursor = conn.execute(
-                    """INSERT INTO api_keys (user_id, key_hash, key_encrypted, key_prefix, name, created_at)
-                       VALUES (?, ?, ?, ?, ?, ?)""",
-                    (user_id, key_hash, key_encrypted, key_prefix, name, now)
+                    """INSERT INTO api_keys (user_id, key_hash, key_encrypted, key_prefix, name, is_super, created_at)
+                       VALUES (?, ?, ?, ?, ?, ?, ?)""",
+                    (user_id, key_hash, key_encrypted, key_prefix, name, 1 if is_super else 0, now)
                 )
                 key_id = cursor.lastrowid
                 api_key = APIKey(
@@ -1351,6 +1363,7 @@ class UserDatabase:
                     key_prefix=key_prefix,
                     name=name,
                     is_active=True,
+                    is_super=is_super,
                     request_count=0,
                     last_used=None,
                     created_at=now
@@ -1618,12 +1631,17 @@ class UserDatabase:
 
     def _row_to_apikey(self, row: sqlite3.Row) -> APIKey:
         """Convert database row to APIKey object."""
+        # 兼容旧数据，is_super 可能不存在
+        is_super = False
+        if hasattr(row, "keys") and "is_super" in row.keys():
+            is_super = bool(row["is_super"])
         return APIKey(
             id=row["id"],
             user_id=row["user_id"],
             key_prefix=row["key_prefix"],
             name=row["name"],
             is_active=bool(row["is_active"]),
+            is_super=is_super,
             request_count=row["request_count"],
             last_used=row["last_used"],
             created_at=row["created_at"]

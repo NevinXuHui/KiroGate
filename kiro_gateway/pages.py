@@ -2842,6 +2842,29 @@ def render_admin_page() -> str:
         </div>
 
         <div class="card">
+          <h2 class="text-lg font-semibold mb-4">🔑 超级 API Key（系统级）</h2>
+          <div class="space-y-3">
+            <div class="text-sm mb-2" style="color: var(--text-muted);">
+              系统级超级 API Key 可访问所有公开 Token 池，不绑定特定用户
+            </div>
+            <div id="superKeysContainer" class="space-y-2 max-h-48 overflow-y-auto p-2 rounded" style="background: var(--bg-input);">
+              <div class="text-center py-4" style="color: var(--text-muted);">加载中...</div>
+            </div>
+            <div class="flex flex-wrap items-center gap-2">
+              <button onclick="generateSuperKey()" class="btn btn-primary">
+                <span>➕</span> 生成新密钥
+              </button>
+              <button onclick="refreshSuperKeys()" class="btn" style="background: var(--bg-input); border: 1px solid var(--border);">
+                <span>🔄</span> 刷新列表
+              </button>
+            </div>
+            <p class="text-xs" style="color: var(--text-muted);">
+              提示：生成的密钥会自动添加到配置中，重启服务后从 .env 文件加载
+            </p>
+          </div>
+        </div>
+
+        <div class="card">
           <h2 class="text-lg font-semibold mb-4">💾 数据导入导出</h2>
           <div class="space-y-4">
             <div class="space-y-2">
@@ -3022,6 +3045,126 @@ def render_admin_page() -> str:
         refreshProxyApiKey();
       }} catch (e) {{
         alert(e.error || '保存失败');
+      }}
+    }}
+
+    // 超级 API Key 管理
+    async function refreshSuperKeys() {{
+      try {{
+        const data = await fetchJson('/admin/api/super-keys');
+        const container = document.getElementById('superKeysContainer');
+        if (!container) return;
+
+        if (!data.super_keys || data.super_keys.length === 0) {{
+          container.innerHTML = '<div class="text-center py-4" style="color: var(--text-muted);">暂无超级 API Key</div>';
+          return;
+        }}
+
+        container.innerHTML = data.super_keys.map(item => `
+          <div class="flex items-center justify-between p-3 rounded" style="background: var(--bg-card); border: 1px solid var(--border);">
+            <div class="flex-1 font-mono text-sm" style="color: var(--text);">
+              ${{item.key}}
+            </div>
+            <div class="flex items-center gap-2">
+              <button onclick="copySuperKey('${{item.full_key}}')" class="text-xs px-2 py-1 rounded bg-blue-500/20 text-blue-400 hover:bg-blue-500/30" title="复制完整密钥">
+                📋 复制
+              </button>
+              <button onclick="deleteSuperKey('${{item.full_key}}')" class="text-xs px-2 py-1 rounded bg-red-500/20 text-red-400 hover:bg-red-500/30" title="删除密钥">
+                🗑️ 删除
+              </button>
+            </div>
+          </div>
+        `).join('');
+      }} catch (e) {{
+        console.error('刷新超级 API Key 失败:', e);
+        const container = document.getElementById('superKeysContainer');
+        if (container) {{
+          container.innerHTML = '<div class="text-center py-4 text-red-400">加载失败</div>';
+        }}
+      }}
+    }}
+
+    async function generateSuperKey() {{
+      if (!confirm('确定要生成新的超级 API Key 吗？\\n\\n生成后会自动添加到系统配置中。')) return;
+
+      try {{
+        const data = await fetchJson('/admin/api/super-keys/generate', {{ method: 'POST', body: new FormData() }});
+
+        if (data.success) {{
+          // 显示生成的密钥
+          const keyDisplay = `
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+✅ 系统级超级 API Key 生成成功！
+
+🔑 Key 前缀: ${{data.key_prefix}}
+⚡ 类型: 系统级超级 API Key
+📊 当前总数: ${{data.count}} 个
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+🔐 完整密钥（请立即保存，仅显示一次）:
+
+${{data.key}}
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+⚠️ 重要提示:
+• 此密钥只显示一次，请立即复制保存
+• 系统级超级 API Key 可访问所有公开 Token 池
+• 不绑定特定用户，适合团队共享使用
+• 请妥善保管，不要泄露给他人
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+          `.trim();
+
+          // 使用 modal 显示
+          const modal = document.createElement('div');
+          modal.style.cssText = 'position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.8); display: flex; align-items: center; justify-content: center; z-index: 10000;';
+          modal.innerHTML = `
+            <div style="background: var(--bg-card); padding: 24px; border-radius: 12px; max-width: 600px; width: 90%; box-shadow: 0 20px 60px rgba(0,0,0,0.5);">
+              <h3 style="margin: 0 0 16px 0; color: var(--text); font-size: 20px;">🎉 超级 API Key 生成成功</h3>
+              <textarea readonly style="width: 100%; height: 320px; padding: 12px; font-family: monospace; font-size: 13px; background: var(--bg-input); color: var(--text); border: 1px solid var(--border); border-radius: 8px; resize: none; line-height: 1.6;" onclick="this.select()">${{keyDisplay}}</textarea>
+              <div style="margin-top: 16px; display: flex; gap: 8px; justify-content: flex-end;">
+                <button onclick="navigator.clipboard.writeText('${{data.key}}').then(() => alert('✅ 密钥已复制到剪贴板！'))" style="padding: 8px 16px; background: var(--primary); color: white; border: none; border-radius: 6px; cursor: pointer; font-size: 14px;">📋 复制密钥</button>
+                <button onclick="this.closest('div[style*=fixed]').remove(); refreshSuperKeys();" style="padding: 8px 16px; background: var(--bg-input); color: var(--text); border: 1px solid var(--border); border-radius: 6px; cursor: pointer; font-size: 14px;">关闭</button>
+              </div>
+            </div>
+          `;
+          document.body.appendChild(modal);
+        }} else {{
+          alert('❌ 生成失败: ' + (data.error || '未知错误'));
+        }}
+      }} catch (error) {{
+        console.error('生成超级 API Key 失败:', error);
+        alert('❌ 生成失败: ' + error.message);
+      }}
+    }}
+
+    async function copySuperKey(key) {{
+      try {{
+        await navigator.clipboard.writeText(key);
+        alert('✅ 密钥已复制到剪贴板！');
+      }} catch (e) {{
+        console.error('复制失败:', e);
+        alert('❌ 复制失败，请手动复制');
+      }}
+    }}
+
+    async function deleteSuperKey(key) {{
+      if (!confirm('确定要删除这个超级 API Key 吗？\\n\\n删除后该密钥将立即失效。')) return;
+
+      try {{
+        const fd = new FormData();
+        fd.append('key', key);
+        const data = await fetchJson('/admin/api/super-keys/delete', {{ method: 'POST', body: fd }});
+
+        if (data.success) {{
+          alert('✅ 删除成功');
+          refreshSuperKeys();
+        }} else {{
+          alert('❌ 删除失败: ' + (data.error || '未知错误'));
+        }}
+      }} catch (error) {{
+        console.error('删除超级 API Key 失败:', error);
+        alert('❌ 删除失败: ' + error.message);
       }}
     }}
 
@@ -4258,6 +4401,7 @@ def render_admin_page() -> str:
     refreshAnnouncement();
     refreshProxyApiKey();
     refreshForceModel();
+    refreshSuperKeys();
     loadDbInfo();
     resetDbImportState('请先上传并解析导出文件。');
     const dbImportFile = document.getElementById('dbImportFile');

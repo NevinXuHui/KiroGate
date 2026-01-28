@@ -279,6 +279,35 @@ async def _parse_auth_header(auth_header: str, request: Request = None) -> tuple
         logger.debug(f"[{get_timestamp()}] 传统模式: 使用全局 AuthManager")
         return token, None, None, None
 
+    # Check if it's a system-level super API key (from .env config)
+    if token.startswith("sk-super-"):
+        from kiro_gateway.token_allocator import token_allocator, NoTokenAvailable
+
+        # Parse super API keys from config
+        super_keys = [k.strip() for k in settings.super_api_keys.split(',') if k.strip()]
+
+        # Check if token matches any configured super key
+        if token in super_keys:
+            logger.info(f"[{get_timestamp()}] 系统级超级 API Key 认证成功: {_mask_token(token)}")
+            try:
+                # Get best token from all public tokens (user_id=None means all public)
+                donated_token, auth_manager = await token_allocator.get_best_token(None)
+                logger.info(f"[{get_timestamp()}] 系统级超级 API Key 使用公共 Token ID={donated_token.id}")
+
+                # Store token_id in request state for usage tracking
+                if request:
+                    request.state.donated_token_id = donated_token.id
+                    request.state.is_super_key = True
+                    request.state.super_key_token = token
+
+                return token, auth_manager, None, None
+            except NoTokenAvailable as e:
+                logger.warning(f"[{get_timestamp()}] 系统级超级 API Key 无可用公共 Token: 错误={e}")
+                raise HTTPException(status_code=503, detail="暂无可用的公共 Token")
+        else:
+            logger.warning(f"[{get_timestamp()}] 无效的系统级超级 API Key: {_mask_token(token)}")
+            raise HTTPException(status_code=401, detail="API Key 无效或缺失")
+
     # Check if it's a user API key (sk-xxx format)
     if token.startswith("sk-"):
         from kiro_gateway.database import user_db
@@ -297,7 +326,27 @@ async def _parse_auth_header(auth_header: str, request: Request = None) -> tuple
             logger.warning(f"[{get_timestamp()}] 被封禁用户尝试使用 API Key: 用户ID={user_id}")
             raise HTTPException(status_code=403, detail="用户已被封禁")
 
-        # Get best token for this user
+        # Super API Key: can access all public tokens (legacy user-level super keys)
+        if api_key.is_super:
+            logger.debug(f"[{get_timestamp()}] 用户级超级 API Key 模式: 用户ID={user_id}, 可访问所有公共 Token")
+            try:
+                # Get best token from all public tokens (user_id=None means all public)
+                donated_token, auth_manager = await token_allocator.get_best_token(None)
+                logger.debug(f"[{get_timestamp()}] 用户级超级 API Key 使用公共 Token ID={donated_token.id}")
+
+                # Store token_id in request state for usage tracking
+                if request:
+                    request.state.donated_token_id = donated_token.id
+                    request.state.api_key_id = api_key.id
+                    request.state.user_id = user_id
+                    request.state.is_super_key = True
+
+                return token, auth_manager, user_id, api_key.id
+            except NoTokenAvailable as e:
+                logger.warning(f"[{get_timestamp()}] 用户级超级 API Key 无可用公共 Token: 错误={e}")
+                raise HTTPException(status_code=503, detail="暂无可用的公共 Token")
+
+        # Regular API Key: only access user's own tokens
         try:
             donated_token, auth_manager = await token_allocator.get_best_token(user_id)
             logger.debug(f"[{get_timestamp()}] 用户 API Key 模式: 用户ID={user_id}, Token ID={donated_token.id}")
@@ -1247,6 +1296,109 @@ async def admin_set_proxy_key(
     return {"success": True}
 
 
+@router.get("/admin/api/super-keys", include_in_schema=False)
+async def admin_get_super_keys(request: Request):
+    """Get system-level super API keys."""
+    session = request.cookies.get("admin_session")
+    if not verify_admin_session(session):
+        return JSONResponse(status_code=401, content={"error": "未授权"})
+
+    from kiro_gateway.config import settings
+    super_keys = [k.strip() for k in settings.super_api_keys.split(',') if k.strip()]
+
+    # Mask keys for security (only show first 15 chars)
+    masked_keys = [{"key": k[:15] + "..." if len(k) > 15 else k, "full_key": k} for k in super_keys]
+
+    return {
+        "super_keys": masked_keys,
+        "count": len(super_keys)
+    }
+
+
+@router.post("/admin/api/super-keys", include_in_schema=False)
+async def admin_set_super_keys(
+    request: Request,
+    super_keys: str = Form(...),
+    _csrf: None = Depends(require_same_origin)
+):
+    """Update system-level super API keys."""
+    session = request.cookies.get("admin_session")
+    if not verify_admin_session(session):
+        return JSONResponse(status_code=401, content={"error": "未授权"})
+
+    from kiro_gateway.config import settings
+
+    # Validate format
+    super_keys = super_keys.strip()
+    if super_keys:
+        keys = [k.strip() for k in super_keys.split(',') if k.strip()]
+        # Validate each key starts with sk-super-
+        for key in keys:
+            if not key.startswith("sk-super-"):
+                return JSONResponse(status_code=400, content={"error": f"无效的超级 API Key 格式: {key[:20]}... (必须以 sk-super- 开头)"})
+
+    # Update settings
+    settings.super_api_keys = super_keys
+
+    return {
+        "success": True,
+        "count": len([k for k in super_keys.split(',') if k.strip()]) if super_keys else 0
+    }
+
+
+@router.post("/admin/api/super-keys/generate", include_in_schema=False)
+async def admin_generate_super_key(
+    request: Request,
+    _csrf: None = Depends(require_same_origin)
+):
+    """Generate a new system-level super API key."""
+    session = request.cookies.get("admin_session")
+    if not verify_admin_session(session):
+        return JSONResponse(status_code=401, content={"error": "未授权"})
+
+    import secrets
+    from kiro_gateway.config import settings
+
+    # Generate a new super key
+    random_part = secrets.token_urlsafe(32)
+    new_key = f"sk-super-{random_part}"
+
+    # Add to existing keys
+    existing_keys = [k.strip() for k in settings.super_api_keys.split(',') if k.strip()]
+    existing_keys.append(new_key)
+    settings.super_api_keys = ','.join(existing_keys)
+
+    return {
+        "success": True,
+        "key": new_key,
+        "key_prefix": new_key[:15] + "...",
+        "count": len(existing_keys)
+    }
+
+
+@router.post("/admin/api/super-keys/delete", include_in_schema=False)
+async def admin_delete_super_key(
+    request: Request,
+    key: str = Form(...),
+    _csrf: None = Depends(require_same_origin)
+):
+    """Delete a system-level super API key."""
+    session = request.cookies.get("admin_session")
+    if not verify_admin_session(session):
+        return JSONResponse(status_code=401, content={"error": "未授权"})
+
+    from kiro_gateway.config import settings
+
+    # Remove key from list
+    existing_keys = [k.strip() for k in settings.super_api_keys.split(',') if k.strip()]
+    if key in existing_keys:
+        existing_keys.remove(key)
+        settings.super_api_keys = ','.join(existing_keys)
+        return {"success": True, "count": len(existing_keys)}
+    else:
+        return JSONResponse(status_code=404, content={"error": "Key 不存在"})
+
+
 @router.post("/admin/api/refresh-token", include_in_schema=False)
 async def admin_refresh_token(
     request: Request,
@@ -1717,6 +1869,36 @@ async def admin_create_import_key(
         "key_prefix": import_key.key_prefix,
         "id": import_key.id,
         "user_id": user_id
+    }
+
+
+@router.post("/admin/api/super-api-keys", include_in_schema=False)
+async def admin_create_super_api_key(
+    request: Request,
+    user_id: int = Form(...),
+    name: str = Form(""),
+    _csrf: None = Depends(require_same_origin)
+):
+    """Create a super API key for a user (admin only)."""
+    session = request.cookies.get("admin_session")
+    if not verify_admin_session(session):
+        return JSONResponse(status_code=401, content={"error": "未授权"})
+
+    from kiro_gateway.database import user_db
+    user = user_db.get_user(user_id)
+    if not user:
+        return JSONResponse(status_code=404, content={"error": "用户不存在"})
+    if user.is_banned:
+        return JSONResponse(status_code=403, content={"error": "用户已被封禁"})
+
+    plain_key, api_key = user_db.generate_api_key(user_id, name or None, is_super=True)
+    return {
+        "success": True,
+        "key": plain_key,
+        "key_prefix": api_key.key_prefix,
+        "id": api_key.id,
+        "user_id": user_id,
+        "is_super": True
     }
 
 
