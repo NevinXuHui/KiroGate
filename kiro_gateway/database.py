@@ -135,7 +135,6 @@ class UserDatabase:
                 );
                 CREATE INDEX IF NOT EXISTS idx_users_linuxdo ON users(linuxdo_id);
                 CREATE INDEX IF NOT EXISTS idx_users_github ON users(github_id);
-                CREATE UNIQUE INDEX IF NOT EXISTS idx_users_email ON users(email) WHERE email IS NOT NULL;
 
                 -- Donated tokens table
                 CREATE TABLE IF NOT EXISTS tokens (
@@ -321,6 +320,14 @@ class UserDatabase:
                 conn.execute(
                     "ALTER TABLE tokens ADD COLUMN usage_data TEXT"
                 )
+
+            # Create email index after migration (if email column exists)
+            users_columns_final = {row[1] for row in conn.execute("PRAGMA table_info(users)")}
+            if "email" in users_columns_final:
+                conn.execute(
+                    "CREATE UNIQUE INDEX IF NOT EXISTS idx_users_email ON users(email) WHERE email IS NOT NULL"
+                )
+
             conn.commit()
         logger.info(f"User database initialized: {self._db_path}")
 
