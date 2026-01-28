@@ -73,7 +73,6 @@ from kiro_gateway.pages import (
     render_home_page,
     render_docs_page,
     render_playground_page,
-    render_deploy_page,
     render_status_page,
     render_dashboard_page,
     render_swagger_page,
@@ -484,15 +483,6 @@ async def playground_page():
     return HTMLResponse(content=render_playground_page())
 
 
-@router.get("/deploy", response_class=HTMLResponse, include_in_schema=False)
-async def deploy_page():
-    """
-    Deployment guide page.
-
-    Returns:
-        HTML deployment guide page
-    """
-    return HTMLResponse(content=render_deploy_page())
 
 
 @router.get("/status", response_class=HTMLResponse, include_in_schema=False)
@@ -1290,6 +1280,7 @@ async def admin_generate_super_key(
 
     import secrets
     from kiro_gateway.config import settings
+    from pathlib import Path
 
     # Generate a new super key
     random_part = secrets.token_urlsafe(32)
@@ -1298,7 +1289,29 @@ async def admin_generate_super_key(
     # Add to existing keys
     existing_keys = [k.strip() for k in settings.super_api_keys.split(',') if k.strip()]
     existing_keys.append(new_key)
-    settings.super_api_keys = ','.join(existing_keys)
+    new_value = ','.join(existing_keys)
+    settings.super_api_keys = new_value
+    
+    # Update .env file
+    env_path = Path(".env")
+    if env_path.exists():
+        try:
+            content = env_path.read_text(encoding="utf-8")
+            lines = content.splitlines()
+            updated = False
+            
+            for i, line in enumerate(lines):
+                if line.strip().startswith("SUPER_API_KEYS="):
+                    lines[i] = f'SUPER_API_KEYS="{new_value}"'
+                    updated = True
+                    break
+            
+            if updated:
+                env_path.write_text('\n'.join(lines) + '\n', encoding="utf-8")
+                logger.info(f"Updated .env file: added super API key")
+        except Exception as e:
+            logger.error(f"Failed to update .env file: {e}")
+            return JSONResponse(status_code=500, content={"error": f"生成成功但更新配置文件失败: {str(e)}"})
 
     return {
         "success": True,
@@ -1320,15 +1333,40 @@ async def admin_delete_super_key(
         return JSONResponse(status_code=401, content={"error": "未授权"})
 
     from kiro_gateway.config import settings
+    import re
+    from pathlib import Path
+
+    # Get default keys from .env file
+    env_path = Path(".env")
+    default_keys = set()
+    if env_path.exists():
+        try:
+            content = env_path.read_text(encoding="utf-8")
+            for line in content.splitlines():
+                if line.strip().startswith("SUPER_API_KEYS="):
+                    # Extract keys from .env
+                    match = re.search(r'SUPER_API_KEYS=["\']?([^"\']*)["\']?', line)
+                    if match:
+                        env_value = match.group(1)
+                        default_keys = {k.strip() for k in env_value.split(',') if k.strip()}
+                    break
+        except Exception as e:
+            logger.error(f"Failed to read .env file: {e}")
+
+    # Check if the key is a default key
+    if key in default_keys:
+        return JSONResponse(status_code=403, content={"error": "无法删除默认的超级 API Key，请在 .env 文件中修改"})
 
     # Remove key from list
     existing_keys = [k.strip() for k in settings.super_api_keys.split(',') if k.strip()]
-    if key in existing_keys:
-        existing_keys.remove(key)
-        settings.super_api_keys = ','.join(existing_keys)
-        return {"success": True, "count": len(existing_keys)}
-    else:
+    if key not in existing_keys:
         return JSONResponse(status_code=404, content={"error": "Key 不存在"})
+    
+    existing_keys.remove(key)
+    new_value = ','.join(existing_keys)
+    settings.super_api_keys = new_value
+    
+    return {"success": True, "count": len(existing_keys)}
 
 
 @router.post("/admin/api/refresh-token", include_in_schema=False)

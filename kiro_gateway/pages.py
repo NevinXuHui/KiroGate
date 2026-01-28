@@ -597,7 +597,6 @@ COMMON_NAV = r'''
             <a href="/docs" class="nav-link">文档</a>
             <a href="/swagger" class="nav-link">接口</a>
             <a href="/playground" class="nav-link">测试</a>
-            <a href="/deploy" class="nav-link">部署</a>
             <a href="/dashboard" class="nav-link">面板</a>
           </div>
         </div>
@@ -637,7 +636,6 @@ COMMON_NAV = r'''
         <a href="/docs" class="block nav-link py-2.5 px-4 rounded-lg hover:bg-indigo-500/10 transition-colors">文档</a>
         <a href="/swagger" class="block nav-link py-2.5 px-4 rounded-lg hover:bg-indigo-500/10 transition-colors">接口</a>
         <a href="/playground" class="block nav-link py-2.5 px-4 rounded-lg hover:bg-indigo-500/10 transition-colors">测试</a>
-        <a href="/deploy" class="block nav-link py-2.5 px-4 rounded-lg hover:bg-indigo-500/10 transition-colors">部署</a>
         <a href="/dashboard" class="block nav-link py-2.5 px-4 rounded-lg hover:bg-indigo-500/10 transition-colors">面板</a>
         <div id="mobile-auth-area" class="pt-3 mt-3" style="border-top: 1px solid var(--border);">
           <a href="/login" class="block py-2.5 px-4 rounded-lg text-center font-medium btn-primary">登录</a>
@@ -1053,17 +1051,8 @@ def render_docs_page() -> str:
         <pre class="p-4 rounded-lg overflow-x-auto text-sm">{{
   "custom_models": [
     {{
-      "model_display_name": "Opus 4.5 [duojie.games]",
-      "model": "claude-opus-4-5-20251101",
-      "base_url": "https://api.duojie.games",
-      "api_key": "sk-BEM06N3GwI1zjmiGzel9UUKjpWfDXMHRB57OIBJIXXPV95qY",
-      "provider": "anthropic",
-      "supports_vision": true,
-      "max_tokens": 8192
-    }},
-    {{
-      "model_display_name": "kiro opus 4.5",
-      "model": "claude-opus-4-5-think",
+      "model_display_name": "KiroGate Claude",
+      "model": "claude-sonnet-4-5",
       "base_url": "{base_url}",
       "api_key": "{api_key}",
       "provider": "anthropic",
@@ -1596,211 +1585,6 @@ def render_playground_page() -> str:
       }}
     }})();
   </script>
-</body>
-</html>'''
-
-
-def render_deploy_page() -> str:
-    """Render the deployment guide page."""
-    return f'''<!DOCTYPE html>
-<html lang="zh">
-<head>{COMMON_HEAD}</head>
-<body>
-  {COMMON_NAV}
-
-  <main class="max-w-7xl mx-auto px-4 py-12">
-    <div class="text-center mb-12">
-      <h1 class="text-4xl font-bold mb-4">
-        <span class="gradient-text">部署指南</span>
-      </h1>
-      <p style="color: var(--text-muted);">快速部署你自己的 徐辉牛逼 实例</p>
-    </div>
-
-    <div class="space-y-8">
-      <section class="card">
-        <div class="flex items-center gap-3 mb-6">
-          <div class="w-10 h-10 rounded-lg flex items-center justify-center text-xl" style="background: linear-gradient(135deg, var(--primary), var(--accent));">📋</div>
-          <h2 class="text-2xl font-semibold">环境要求</h2>
-        </div>
-        <div class="grid sm:grid-cols-3 gap-4">
-          <div class="p-4 rounded-xl text-center" style="background: var(--bg-input); border: 1px solid var(--border);">
-            <div class="text-3xl mb-2">🐍</div>
-            <div class="font-medium">Python 3.10+</div>
-          </div>
-          <div class="p-4 rounded-xl text-center" style="background: var(--bg-input); border: 1px solid var(--border);">
-            <div class="text-3xl mb-2">📦</div>
-            <div class="font-medium">pip 或 poetry</div>
-          </div>
-          <div class="p-4 rounded-xl text-center" style="background: var(--bg-input); border: 1px solid var(--border);">
-            <div class="text-3xl mb-2">🌐</div>
-            <div class="font-medium">网络连接</div>
-          </div>
-        </div>
-      </section>
-
-      <section class="card">
-        <div class="flex items-center gap-3 mb-6">
-          <div class="w-10 h-10 rounded-lg flex items-center justify-center text-xl" style="background: linear-gradient(135deg, var(--primary), var(--accent));">⚙️</div>
-          <h2 class="text-2xl font-semibold">环境变量配置</h2>
-        </div>
-        <pre class="p-4 rounded-lg overflow-x-auto text-sm">
-# 必填项
-PROXY_API_KEY="your-secret-api-key"      # 代理服务器密码
-
-# 可选项（仅简单模式需要）
-# 如果使用组合模式（PROXY_API_KEY:REFRESH_TOKEN），可以不配置此项
-REFRESH_TOKEN="your-kiro-refresh-token"  # Kiro Refresh Token
-
-# 其他可选配置
-KIRO_REGION="us-east-1"                  # AWS 区域
-PROFILE_ARN="arn:aws:..."                # Profile ARN
-LOG_LEVEL="INFO"                          # 日志级别
-
-# 或使用凭证文件
-KIRO_CREDS_FILE="~/.kiro/credentials.json"</pre>
-
-        <div class="p-4 rounded-xl mt-4" style="background: linear-gradient(135deg, rgba(99, 102, 241, 0.1), rgba(139, 92, 246, 0.1)); border: 1px solid rgba(99, 102, 241, 0.2);">
-          <p class="text-sm font-semibold mb-2" style="color: var(--text);">💡 配置说明</p>
-          <ul class="text-sm space-y-1.5" style="color: var(--text-muted);">
-            <li>• <strong>简单模式</strong>：必须配置 <code class="px-1.5 py-0.5 rounded" style="background: var(--bg-input);">REFRESH_TOKEN</code> 环境变量</li>
-            <li>• <strong>组合模式（推荐）</strong>：无需配置 <code class="px-1.5 py-0.5 rounded" style="background: var(--bg-input);">REFRESH_TOKEN</code>，用户在请求中直接传递</li>
-            <li>• <strong>多租户部署</strong>：使用组合模式可以让多个用户共享同一网关实例</li>
-          </ul>
-        </div>
-      </section>
-
-      <section class="card">
-        <div class="flex items-center gap-3 mb-6">
-          <div class="w-10 h-10 rounded-lg flex items-center justify-center text-xl" style="background: linear-gradient(135deg, var(--primary), var(--accent));">🐍</div>
-          <h2 class="text-2xl font-semibold">本地运行</h2>
-        </div>
-        <pre class="p-4 rounded-lg overflow-x-auto text-sm">
-# 克隆仓库
-git clone https://github.com/dext7r/KiroGate.git
-cd KiroGate
-
-# 安装依赖
-pip install -r requirements.txt
-
-# 配置环境变量
-cp .env.example .env
-# 编辑 .env 填写配置
-
-# 启动服务
-python main.py</pre>
-      </section>
-
-      <section class="card">
-        <div class="flex items-center gap-3 mb-6">
-          <div class="w-10 h-10 rounded-lg flex items-center justify-center text-xl" style="background: linear-gradient(135deg, var(--primary), var(--accent));">🐳</div>
-          <h2 class="text-2xl font-semibold">Docker 部署</h2>
-        </div>
-
-        <div class="space-y-6">
-          <div>
-            <h3 class="text-lg font-medium mb-3 text-emerald-400">Docker Compose（推荐）</h3>
-            <pre class="p-4 rounded-lg overflow-x-auto text-sm">
-# 复制配置文件
-cp .env.example .env
-# 编辑 .env 填写你的凭证
-
-# 启动服务（自动创建持久卷）
-docker-compose up -d
-
-# 查看日志
-docker logs -f kirogate</pre>
-          </div>
-
-          <div>
-            <h3 class="text-lg font-medium mb-3 text-blue-400">手动 Docker 运行</h3>
-            <pre class="p-4 rounded-lg overflow-x-auto text-sm">
-docker build -t kirogate .
-docker run -d -p 8000:8000 \\
-  -v kirogate_data:/app/data \\
-  -e PROXY_API_KEY="your-key" \\
-  -e ADMIN_PASSWORD="your-admin-pwd" \\
-  --name kirogate kirogate</pre>
-          </div>
-        </div>
-      </section>
-
-      <section class="card">
-        <div class="flex items-center gap-3 mb-6">
-          <div class="w-10 h-10 rounded-lg flex items-center justify-center text-xl" style="background: linear-gradient(135deg, var(--primary), var(--accent));">🚀</div>
-          <h2 class="text-2xl font-semibold">Fly.io 部署</h2>
-        </div>
-        <pre class="p-4 rounded-lg overflow-x-auto text-sm">
-# 1. 安装 Fly CLI 并登录
-curl -L https://fly.io/install.sh | sh
-fly auth login
-
-# 2. 创建应用
-fly apps create kirogate
-
-# 3. 创建持久卷（重要！保证数据不丢失）
-fly volumes create kirogate_data --region nrt --size 1
-
-# 4. 设置环境变量
-fly secrets set PROXY_API_KEY="your-password"
-fly secrets set ADMIN_PASSWORD="your-admin-password"
-fly secrets set ADMIN_SECRET_KEY="your-random-secret"
-
-# 5. 部署
-fly deploy</pre>
-      </section>
-
-      <section class="card">
-        <div class="flex items-center gap-3 mb-6">
-          <div class="w-10 h-10 rounded-lg flex items-center justify-center text-xl" style="background: linear-gradient(135deg, var(--danger), #f97316);">💾</div>
-          <h2 class="text-2xl font-semibold">数据持久化</h2>
-        </div>
-        <div class="p-4 rounded-xl mb-4" style="background: rgba(239, 68, 68, 0.1); border: 1px solid rgba(239, 68, 68, 0.3);">
-          <p class="text-sm font-semibold text-red-400">⚠️ 重要提醒</p>
-          <p class="text-sm mt-1" style="color: var(--text-muted);">用户数据（数据库）需要持久化存储，否则每次部署会丢失所有用户、Token 和 API Key！</p>
-        </div>
-        <div class="grid sm:grid-cols-2 gap-4">
-          <div class="p-4 rounded-xl" style="background: var(--bg-input); border: 1px solid var(--border);">
-            <p class="font-medium text-emerald-400 mb-2">🐳 Docker Compose</p>
-            <p class="text-sm" style="color: var(--text-muted);">已配置命名卷 <code class="px-1.5 py-0.5 rounded" style="background: var(--bg-card);">kirogate_data:/app/data</code>，使用 <code class="px-1.5 py-0.5 rounded" style="background: var(--bg-card);">docker-compose down</code> 保留数据</p>
-          </div>
-          <div class="p-4 rounded-xl" style="background: var(--bg-input); border: 1px solid var(--border);">
-            <p class="font-medium text-blue-400 mb-2">🚀 Fly.io</p>
-            <p class="text-sm" style="color: var(--text-muted);">需手动创建卷：<code class="px-1.5 py-0.5 rounded" style="background: var(--bg-card);">fly volumes create kirogate_data --region nrt --size 1</code></p>
-          </div>
-        </div>
-      </section>
-
-      <section class="card">
-        <div class="flex items-center gap-3 mb-6">
-          <div class="w-10 h-10 rounded-lg flex items-center justify-center text-xl" style="background: linear-gradient(135deg, var(--primary), var(--accent));">🔐</div>
-          <h2 class="text-2xl font-semibold">获取 Refresh Token</h2>
-        </div>
-
-        <div class="space-y-4">
-          <div class="p-4 rounded-xl" style="background: linear-gradient(135deg, rgba(16, 185, 129, 0.1), rgba(16, 185, 129, 0.05)); border: 1px solid rgba(16, 185, 129, 0.2);">
-            <p class="text-sm font-semibold mb-3 text-emerald-400">🌐 方式一：浏览器获取（推荐）</p>
-            <ol class="text-sm space-y-2" style="color: var(--text-muted);">
-              <li><span class="inline-flex items-center justify-center w-5 h-5 rounded-full text-xs font-bold mr-2" style="background: var(--primary); color: white;">1</span>打开 <a href="https://app.kiro.dev/account/usage" target="_blank" class="text-indigo-400 hover:underline">https://app.kiro.dev/account/usage</a> 并登录</li>
-              <li><span class="inline-flex items-center justify-center w-5 h-5 rounded-full text-xs font-bold mr-2" style="background: var(--primary); color: white;">2</span>按 <kbd class="px-1.5 py-0.5 rounded text-xs" style="background: var(--bg-input); border: 1px solid var(--border);">F12</kbd> 打开开发者工具</li>
-              <li><span class="inline-flex items-center justify-center w-5 h-5 rounded-full text-xs font-bold mr-2" style="background: var(--primary); color: white;">3</span>点击 <strong>应用/Application</strong> → <strong>存储/Storage</strong> → <strong>Cookie</strong></li>
-              <li><span class="inline-flex items-center justify-center w-5 h-5 rounded-full text-xs font-bold mr-2" style="background: var(--primary); color: white;">4</span>选择 <code class="px-1.5 py-0.5 rounded" style="background: var(--bg-input);">https://app.kiro.dev</code></li>
-              <li><span class="inline-flex items-center justify-center w-5 h-5 rounded-full text-xs font-bold mr-2" style="background: var(--primary); color: white;">5</span>复制 <code class="text-emerald-400">RefreshToken</code> 的值</li>
-            </ol>
-          </div>
-
-          <div class="p-4 rounded-xl" style="background: linear-gradient(135deg, rgba(99, 102, 241, 0.1), rgba(139, 92, 246, 0.1)); border: 1px solid rgba(99, 102, 241, 0.2);">
-            <p class="text-sm font-semibold mb-2" style="color: var(--text);">🛠️ 方式二：Kiro Account Manager</p>
-            <p class="text-sm" style="color: var(--text-muted);">
-              使用 <a href="https://github.com/chaogei/Kiro-account-manager" class="text-indigo-400 hover:underline font-medium" target="_blank">Kiro Account Manager</a>
-              可以轻松管理多个账号的 Refresh Token。
-            </p>
-          </div>
-        </div>
-      </section>
-    </div>
-  </main>
-
-  {COMMON_FOOTER}
 </body>
 </html>'''
 
@@ -3105,13 +2889,33 @@ ${{data.key}}
           modal.innerHTML = `
             <div style="background: var(--bg-card); padding: 24px; border-radius: 12px; max-width: 600px; width: 90%; box-shadow: 0 20px 60px rgba(0,0,0,0.5);">
               <h3 style="margin: 0 0 16px 0; color: var(--text); font-size: 20px;">🎉 超级 API Key 生成成功</h3>
-              <textarea readonly style="width: 100%; height: 320px; padding: 12px; font-family: monospace; font-size: 13px; background: var(--bg-input); color: var(--text); border: 1px solid var(--border); border-radius: 8px; resize: none; line-height: 1.6;" onclick="this.select()">${{keyDisplay}}</textarea>
+              <textarea id="generatedKeyTextarea" readonly style="width: 100%; height: 320px; padding: 12px; font-family: monospace; font-size: 13px; background: var(--bg-input); color: var(--text); border: 1px solid var(--border); border-radius: 8px; resize: none; line-height: 1.6;" onclick="this.select()">${{keyDisplay}}</textarea>
               <div style="margin-top: 16px; display: flex; gap: 8px; justify-content: flex-end;">
-                <button onclick="navigator.clipboard.writeText('${{data.key}}').then(() => alert('✅ 密钥已复制到剪贴板！'))" style="padding: 8px 16px; background: var(--primary); color: white; border: none; border-radius: 6px; cursor: pointer; font-size: 14px;">📋 复制密钥</button>
+                <button id="copyKeyBtn" style="padding: 8px 16px; background: var(--primary); color: white; border: none; border-radius: 6px; cursor: pointer; font-size: 14px;">📋 复制密钥</button>
                 <button onclick="this.closest('div[style*=fixed]').remove(); refreshSuperKeys();" style="padding: 8px 16px; background: var(--bg-input); color: var(--text); border: 1px solid var(--border); border-radius: 6px; cursor: pointer; font-size: 14px;">关闭</button>
               </div>
             </div>
           `;
+          document.body.appendChild(modal);
+          
+          // 添加复制按钮事件监听
+          document.getElementById('copyKeyBtn').addEventListener('click', async () => {{
+            try {{
+              await navigator.clipboard.writeText(data.key);
+              alert('✅ 密钥已复制到剪贴板！');
+            }} catch (e) {{
+              // 如果 clipboard API 失败，尝试使用传统方法
+              const textarea = document.getElementById('generatedKeyTextarea');
+              textarea.select();
+              try {{
+                document.execCommand('copy');
+                alert('✅ 密钥已复制到剪贴板！');
+              }} catch (err) {{
+                console.error('复制失败:', err);
+                alert('❌ 复制失败，请手动选择并复制');
+              }}
+            }}
+          }});
           document.body.appendChild(modal);
         }} else {{
           alert('❌ 生成失败: ' + (data.error || '未知错误'));
@@ -3128,7 +2932,22 @@ ${{data.key}}
         alert('✅ 密钥已复制到剪贴板！');
       }} catch (e) {{
         console.error('复制失败:', e);
-        alert('❌ 复制失败，请手动复制');
+        // 使用传统方法作为备选
+        const textarea = document.createElement('textarea');
+        textarea.value = key;
+        textarea.style.position = 'fixed';
+        textarea.style.opacity = '0';
+        document.body.appendChild(textarea);
+        textarea.select();
+        try {{
+          document.execCommand('copy');
+          alert('✅ 密钥已复制到剪贴板！');
+        }} catch (err) {{
+          console.error('备选复制方法也失败:', err);
+          alert('❌ 复制失败，请手动复制:\\n\\n' + key);
+        }} finally {{
+          document.body.removeChild(textarea);
+        }}
       }}
     }}
 
