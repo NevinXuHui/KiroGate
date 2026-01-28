@@ -154,24 +154,8 @@ def validate_configuration() -> None:
     """
     验证所需配置是否存在。
 
-    支持两种认证模式：
-    1. 简单模式：需要配置 REFRESH_TOKEN 或 KIRO_CREDS_FILE
-    2. 组合模式：只需配置 PROXY_API_KEY，REFRESH_TOKEN 由用户在请求中传递
-
-    Raises:
-        SystemExit: 如果缺少关键配置（PROXY_API_KEY）
+    检查是否配置了 REFRESH_TOKEN 或 KIRO_CREDS_FILE。
     """
-    errors = []
-
-    # PROXY_API_KEY 是必须的
-    if not settings.proxy_api_key:
-        errors.append(
-            "PROXY_API_KEY is required!\n"
-            "\n"
-            "Set PROXY_API_KEY in environment variable or .env file.\n"
-            "This is the password used to authenticate API requests."
-        )
-
     # 检查凭证配置
     has_refresh_token = bool(settings.refresh_token)
     has_creds_file = bool(settings.kiro_creds_file)
@@ -185,24 +169,10 @@ def validate_configuration() -> None:
                 has_creds_file = False
                 logger.warning(f"KIRO_CREDS_FILE not found: {settings.kiro_creds_file}")
 
-    # 打印错误并退出（如果有）
-    if errors:
-        logger.error("")
-        logger.error("=" * 60)
-        logger.error("  CONFIGURATION ERROR")
-        logger.error("=" * 60)
-        for error in errors:
-            for line in error.split('\n'):
-                logger.error(f"  {line}")
-        logger.error("=" * 60)
-        logger.error("")
-        sys.exit(1)
-
     # 记录配置模式
     config_source = "environment variables" if not Path(".env").exists() else ".env file"
 
     if has_refresh_token or has_creds_file:
-        # 简单模式：服务器配置了 REFRESH_TOKEN
         if settings.kiro_creds_file:
             if settings.kiro_creds_file.startswith(('http://', 'https://')):
                 logger.info(f"Using credentials from URL: {settings.kiro_creds_file} (via {config_source})")
@@ -210,12 +180,9 @@ def validate_configuration() -> None:
                 logger.info(f"Using credentials file: {settings.kiro_creds_file} (via {config_source})")
         elif settings.refresh_token:
             logger.info(f"Using refresh token (via {config_source})")
-        logger.info("Auth mode: Simple mode (server-configured REFRESH_TOKEN) + Multi-tenant mode supported")
     else:
-        # 仅组合模式：用户在请求中传递 REFRESH_TOKEN
-        logger.info("No REFRESH_TOKEN configured - running in multi-tenant only mode")
-        logger.info("Auth mode: Multi-tenant only (users must provide PROXY_API_KEY:REFRESH_TOKEN)")
-        logger.info("Tip: Configure REFRESH_TOKEN to enable simple mode authentication")
+        logger.info("No REFRESH_TOKEN configured")
+        logger.info("Tip: Configure REFRESH_TOKEN or KIRO_CREDS_FILE to enable authentication")
 
 
 # 运行配置验证

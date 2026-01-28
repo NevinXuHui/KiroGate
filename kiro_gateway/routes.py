@@ -53,7 +53,6 @@ from loguru import logger
 
 from kiro_gateway.middleware import get_timestamp
 from kiro_gateway.config import (
-    PROXY_API_KEY,
     AVAILABLE_MODELS,
     APP_VERSION,
     RATE_LIMIT_PER_MINUTE,
@@ -166,17 +165,6 @@ def _get_import_key_from_request(request: Request) -> str | None:
     return key or None
 
 
-def _get_proxy_api_key(request: Request | None = None) -> str:
-    try:
-        from kiro_gateway.metrics import metrics
-        proxy_key = metrics.get_proxy_api_key()
-        if proxy_key:
-            return proxy_key
-    except Exception:
-        pass
-    return PROXY_API_KEY
-
-
 def _is_https_request(request: Request) -> bool:
     """Return True if request is HTTPS (including proxy headers)."""
     forwarded_proto = request.headers.get("x-forwarded-proto")
@@ -228,19 +216,18 @@ def require_same_origin(request: Request) -> None:
 
 async def _parse_auth_header(auth_header: str, request: Request = None) -> tuple[str, KiroAuthManager, int | None, int | None]:
     """
-    Parse Authorization header and return proxy key, AuthManager, and optional user/key IDs.
+    Parse Authorization header and return AuthManager and optional user/key IDs.
 
-    Supports three formats:
-    1. Traditional: "Bearer {PROXY_API_KEY}" - uses global AuthManager
-    2. Multi-tenant: "Bearer {PROXY_API_KEY}:{REFRESH_TOKEN}" - creates per-user AuthManager
-    3. User API Key: "Bearer sk-xxx" - uses user's donated tokens
+    Supports two formats:
+    1. Global mode: "Bearer {REFRESH_TOKEN}" - uses global AuthManager
+    2. User API Key: "Bearer sk-xxx" - uses user's donated tokens
 
     Args:
         auth_header: Authorization header value
         request: Optional FastAPI Request for accessing app.state
 
     Returns:
-        Tuple of (proxy_key, auth_manager, user_id, api_key_id)
+        Tuple of (token, auth_manager, user_id, api_key_id)
         user_id and api_key_id are set when using sk-xxx format
 
     Raises:
@@ -252,57 +239,27 @@ async def _parse_auth_header(auth_header: str, request: Request = None) -> tuple
 
     token = auth_header[7:]  # Remove "Bearer "
 
-    proxy_api_key = _get_proxy_api_key(request)
-
-    # Check if token contains ':' (multi-tenant format)
-    if ':' in token:
-        parts = token.split(':', 1)  # Split only once
-        proxy_key = parts[0]
-        refresh_token = parts[1]
-
-        # Verify proxy key
-        if not secrets.compare_digest(proxy_key, proxy_api_key):
-            logger.warning(f"[{get_timestamp()}] 多租户模式下 Proxy Key 无效: {_mask_token(proxy_key)}")
-            raise HTTPException(status_code=401, detail="API Key 无效或缺失")
-
-        # Get or create AuthManager for this refresh token
-        logger.debug(f"[{get_timestamp()}] 多租户模式: 使用自定义 Refresh Token {_mask_token(refresh_token)}")
-        auth_manager = await auth_cache.get_or_create(
-            refresh_token=refresh_token,
-            region=settings.region,
-            profile_arn=settings.profile_arn
-        )
-        return proxy_key, auth_manager, None, None
-
-    # Traditional mode: verify entire token as PROXY_API_KEY
-    if secrets.compare_digest(token, proxy_api_key):
-        logger.debug(f"[{get_timestamp()}] 传统模式: 使用全局 AuthManager")
-        return token, None, None, None
-
-    # Check if it's a system-level super API key (from .env config)
+    # Check if it's a system-level super API key (sk-super-xxx format)
     if token.startswith("sk-super-"):
         from kiro_gateway.token_allocator import token_allocator, NoTokenAvailable
 
-        # Parse super API keys from config
         super_keys = [k.strip() for k in settings.super_api_keys.split(',') if k.strip()]
-
-        # Check if token matches any configured super key
+        
         if token in super_keys:
             logger.info(f"[{get_timestamp()}] 系统级超级 API Key 认证成功: {_mask_token(token)}")
+            
             try:
-                # Get best token from all public tokens (user_id=None means all public)
                 donated_token, auth_manager = await token_allocator.get_best_token(None)
-                logger.info(f"[{get_timestamp()}] 系统级超级 API Key 使用公共 Token ID={donated_token.id}")
-
-                # Store token_id in request state for usage tracking
+                logger.debug(f"[{get_timestamp()}] 系统级超级 API Key 模式: Token ID={donated_token.id}")
+                
                 if request:
                     request.state.donated_token_id = donated_token.id
                     request.state.is_super_key = True
                     request.state.super_key_token = token
-
+                
                 return token, auth_manager, None, None
             except NoTokenAvailable as e:
-                logger.warning(f"[{get_timestamp()}] 系统级超级 API Key 无可用公共 Token: 错误={e}")
+                logger.warning(f"[{get_timestamp()}] 暂无可用的公共 Token: 错误={e}")
                 raise HTTPException(status_code=503, detail="暂无可用的公共 Token")
         else:
             logger.warning(f"[{get_timestamp()}] 无效的系统级超级 API Key: {_mask_token(token)}")
@@ -326,26 +283,6 @@ async def _parse_auth_header(auth_header: str, request: Request = None) -> tuple
             logger.warning(f"[{get_timestamp()}] 被封禁用户尝试使用 API Key: 用户ID={user_id}")
             raise HTTPException(status_code=403, detail="用户已被封禁")
 
-        # Super API Key: can access all public tokens (legacy user-level super keys)
-        if api_key.is_super:
-            logger.debug(f"[{get_timestamp()}] 用户级超级 API Key 模式: 用户ID={user_id}, 可访问所有公共 Token")
-            try:
-                # Get best token from all public tokens (user_id=None means all public)
-                donated_token, auth_manager = await token_allocator.get_best_token(None)
-                logger.debug(f"[{get_timestamp()}] 用户级超级 API Key 使用公共 Token ID={donated_token.id}")
-
-                # Store token_id in request state for usage tracking
-                if request:
-                    request.state.donated_token_id = donated_token.id
-                    request.state.api_key_id = api_key.id
-                    request.state.user_id = user_id
-                    request.state.is_super_key = True
-
-                return token, auth_manager, user_id, api_key.id
-            except NoTokenAvailable as e:
-                logger.warning(f"[{get_timestamp()}] 用户级超级 API Key 无可用公共 Token: 错误={e}")
-                raise HTTPException(status_code=503, detail="暂无可用的公共 Token")
-
         # Regular API Key: only access user's own tokens
         try:
             donated_token, auth_manager = await token_allocator.get_best_token(user_id)
@@ -362,8 +299,9 @@ async def _parse_auth_header(auth_header: str, request: Request = None) -> tuple
             logger.warning(f"[{get_timestamp()}] 用户可用 Token 不足: 用户ID={user_id}, 错误={e}")
             raise HTTPException(status_code=503, detail="该用户暂无可用的 Token")
 
-    logger.warning(f"[{get_timestamp()}] 传统模式下 API Key 无效")
-    raise HTTPException(status_code=401, detail="API Key 无效或缺失")
+    # Global mode: use global AuthManager
+    logger.debug(f"[{get_timestamp()}] 全局模式: 使用全局 AuthManager")
+    return token, None, None, None
 
 
 async def verify_api_key(
@@ -373,10 +311,9 @@ async def verify_api_key(
     """
     Verify API key in Authorization header and return appropriate AuthManager.
 
-    Supports three formats:
-    1. Traditional: "Bearer {PROXY_API_KEY}" - uses global AuthManager
-    2. Multi-tenant: "Bearer {PROXY_API_KEY}:{REFRESH_TOKEN}" - creates per-user AuthManager
-    3. User API Key: "Bearer sk-xxx" - uses user's donated tokens
+    Supports two formats:
+    1. Global mode: "Bearer {REFRESH_TOKEN}" - uses global AuthManager
+    2. User API Key: "Bearer sk-xxx" - uses user's donated tokens
 
     Args:
         request: FastAPI Request for accessing app.state
@@ -388,11 +325,15 @@ async def verify_api_key(
     Raises:
         HTTPException: 401 if key is invalid or missing
     """
-    proxy_key, auth_manager, user_id, api_key_id = await _parse_auth_header(auth_header, request)
+    token, auth_manager, user_id, api_key_id = await _parse_auth_header(auth_header, request)
 
     # If auth_manager is None, use global AuthManager
     if auth_manager is None:
         auth_manager = request.app.state.auth_manager
+
+    # Store user_id and api_key_id in request state for metrics
+    request.state.user_id = user_id
+    request.state.api_key_id = api_key_id
 
     return auth_manager
 
@@ -408,10 +349,10 @@ async def verify_anthropic_api_key(
     Anthropic uses x-api-key header, but we also support
     standard Authorization: Bearer format for compatibility.
 
-    Supports three formats:
-    1. Traditional: "{PROXY_API_KEY}" - uses global AuthManager
-    2. Multi-tenant: "{PROXY_API_KEY}:{REFRESH_TOKEN}" - creates per-user AuthManager
-    3. User API Key: "sk-xxx" - uses user's donated tokens
+    Supports formats:
+    1. System-level Super API Key: "sk-super-xxx" - uses all public tokens
+    2. User API Key: "sk-xxx" - uses user's donated tokens
+    3. Multi-tenant: "{REFRESH_TOKEN}" with colon - creates per-user AuthManager
 
     Args:
         request: FastAPI Request for accessing app.state
@@ -424,34 +365,33 @@ async def verify_anthropic_api_key(
     Raises:
         HTTPException: 401 if key is invalid or missing
     """
-    proxy_api_key = _get_proxy_api_key(request)
 
     # Try x-api-key first (Anthropic format)
     if x_api_key:
-        # Check if x-api-key contains ':' (multi-tenant format)
-        if ':' in x_api_key:
-            parts = x_api_key.split(':', 1)
-            proxy_key = parts[0]
-            refresh_token = parts[1]
+        # Check if it's a system-level super API key (sk-super-xxx format)
+        if x_api_key.startswith("sk-super-"):
+            from kiro_gateway.token_allocator import token_allocator, NoTokenAvailable
 
-            # Verify proxy key
-            if not secrets.compare_digest(proxy_key, proxy_api_key):
-                logger.warning(f"[{get_timestamp()}] x-api-key 多租户模式下 Proxy Key 无效: {_mask_token(proxy_key)}")
+            super_keys = [k.strip() for k in settings.super_api_keys.split(',') if k.strip()]
+            
+            if x_api_key in super_keys:
+                logger.info(f"[{get_timestamp()}] x-api-key 系统级超级 API Key 认证成功: {_mask_token(x_api_key)}")
+                
+                try:
+                    donated_token, auth_manager = await token_allocator.get_best_token(None)
+                    logger.debug(f"[{get_timestamp()}] x-api-key 系统级超级 API Key 模式: Token ID={donated_token.id}")
+                    
+                    request.state.donated_token_id = donated_token.id
+                    request.state.is_super_key = True
+                    request.state.super_key_token = x_api_key
+                    
+                    return auth_manager
+                except NoTokenAvailable as e:
+                    logger.warning(f"[{get_timestamp()}] 暂无可用的公共 Token: 错误={e}")
+                    raise HTTPException(status_code=503, detail="暂无可用的公共 Token")
+            else:
+                logger.warning(f"[{get_timestamp()}] x-api-key 无效的系统级超级 API Key: {_mask_token(x_api_key)}")
                 raise HTTPException(status_code=401, detail="API Key 无效或缺失")
-
-            # Get or create AuthManager for this refresh token
-            logger.debug(f"[{get_timestamp()}] x-api-key 多租户模式: 使用自定义 Refresh Token {_mask_token(refresh_token)}")
-            auth_manager = await auth_cache.get_or_create(
-                refresh_token=refresh_token,
-                region=settings.region,
-                profile_arn=settings.profile_arn
-            )
-            return auth_manager
-
-        # Traditional mode: verify entire x-api-key as PROXY_API_KEY
-        if secrets.compare_digest(x_api_key, proxy_api_key):
-            logger.debug(f"[{get_timestamp()}] x-api-key 传统模式: 使用全局 AuthManager")
-            return request.app.state.auth_manager
 
         # Check if it's a user API key (sk-xxx format)
         if x_api_key.startswith("sk-"):
@@ -1268,12 +1208,11 @@ async def admin_set_force_model(
 
 @router.get("/admin/api/proxy-key", include_in_schema=False)
 async def admin_get_proxy_key(request: Request):
-    """Get proxy API key."""
+    """Get proxy API key (deprecated - returns empty string)."""
     session = request.cookies.get("admin_session")
     if not verify_admin_session(session):
         return JSONResponse(status_code=401, content={"error": "未授权"})
-    from kiro_gateway.metrics import metrics
-    return {"proxy_api_key": metrics.get_proxy_api_key()}
+    return {"proxy_api_key": ""}
 
 
 @router.post("/admin/api/proxy-key", include_in_schema=False)
@@ -1282,17 +1221,10 @@ async def admin_set_proxy_key(
     proxy_api_key: str = Form(...),
     _csrf: None = Depends(require_same_origin)
 ):
-    """Update proxy API key."""
+    """Update proxy API key (deprecated - no-op)."""
     session = request.cookies.get("admin_session")
     if not verify_admin_session(session):
         return JSONResponse(status_code=401, content={"error": "未授权"})
-    proxy_api_key = proxy_api_key.strip()
-    if not proxy_api_key:
-        return JSONResponse(status_code=400, content={"error": "API Key 不能为空"})
-    from kiro_gateway.metrics import metrics
-    success = metrics.set_proxy_api_key(proxy_api_key)
-    if not success:
-        return JSONResponse(status_code=500, content={"error": "更新失败"})
     return {"success": True}
 
 
@@ -1869,36 +1801,6 @@ async def admin_create_import_key(
         "key_prefix": import_key.key_prefix,
         "id": import_key.id,
         "user_id": user_id
-    }
-
-
-@router.post("/admin/api/super-api-keys", include_in_schema=False)
-async def admin_create_super_api_key(
-    request: Request,
-    user_id: int = Form(...),
-    name: str = Form(""),
-    _csrf: None = Depends(require_same_origin)
-):
-    """Create a super API key for a user (admin only)."""
-    session = request.cookies.get("admin_session")
-    if not verify_admin_session(session):
-        return JSONResponse(status_code=401, content={"error": "未授权"})
-
-    from kiro_gateway.database import user_db
-    user = user_db.get_user(user_id)
-    if not user:
-        return JSONResponse(status_code=404, content={"error": "用户不存在"})
-    if user.is_banned:
-        return JSONResponse(status_code=403, content={"error": "用户已被封禁"})
-
-    plain_key, api_key = user_db.generate_api_key(user_id, name or None, is_super=True)
-    return {
-        "success": True,
-        "key": plain_key,
-        "key_prefix": api_key.key_prefix,
-        "id": api_key.id,
-        "user_id": user_id,
-        "is_super": True
     }
 
 

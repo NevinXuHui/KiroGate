@@ -1025,7 +1025,7 @@ def render_docs_page() -> str:
     from kiro_gateway.config import settings
 
     # 动态获取当前配置
-    api_key = settings.proxy_api_key
+    api_key = "your-api-key-here"
     base_url = "http://localhost:9000"
     base_url_v1 = f"{base_url}/v1"
 
@@ -2822,22 +2822,6 @@ def render_admin_page() -> str:
               <option value="claude-haiku-4-5">claude-haiku-4-5（快速模型）</option>
               <option value="claude-3-7-sonnet-20250219">claude-3-7-sonnet（旧版）</option>
             </select>
-          </div>
-        </div>
-
-        <div class="card">
-          <h2 class="text-lg font-semibold mb-4">🔐 Proxy API Key</h2>
-          <div class="space-y-3">
-            <input id="proxyApiKeyInput" type="password" class="w-full rounded px-3 py-2"
-              style="background: var(--bg-input); border: 1px solid var(--border); color: var(--text);"
-              placeholder="未加载">
-            <div class="flex flex-wrap items-center gap-2">
-              <button onclick="refreshProxyApiKey()" class="btn" style="background: var(--bg-input); border: 1px solid var(--border);">刷新</button>
-              <button onclick="toggleProxyApiKey()" id="proxyApiKeyToggle" class="btn" style="background: var(--bg-input); border: 1px solid var(--border);">显示</button>
-              <button onclick="copyProxyApiKey()" class="btn" style="background: var(--bg-input); border: 1px solid var(--border);">复制</button>
-              <button onclick="saveProxyApiKey()" class="btn btn-primary">保存</button>
-            </div>
-            <p class="text-xs" style="color: var(--text-muted);">保存后立即生效，旧 Key 会失效。</p>
           </div>
         </div>
 

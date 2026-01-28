@@ -86,12 +86,7 @@ class Settings(BaseSettings):
         extra="ignore",
     )
 
-    # ==================================================================================================
-    # 代理服务器设置
-    # ==================================================================================================
 
-    # 代理 API 密钥（客户端需要在 Authorization header 中传递）
-    proxy_api_key: str = Field(default="changeme_proxy_secret", alias="PROXY_API_KEY")
 
     # ==================================================================================================
     # Kiro API 凭证
@@ -381,7 +376,6 @@ if _raw_creds_file:
 # WARNING: These constants are deprecated. Use `settings.xxx` directly in new code.
 # ==================================================================================================
 
-PROXY_API_KEY: str = settings.proxy_api_key
 REFRESH_TOKEN: str = settings.refresh_token
 PROFILE_ARN: str = settings.profile_arn
 REGION: str = settings.region

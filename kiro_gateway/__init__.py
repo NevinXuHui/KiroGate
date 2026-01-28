@@ -53,7 +53,6 @@ from kiro_gateway.routes import router
 
 # 配置
 from kiro_gateway.config import (
-    PROXY_API_KEY,
     REGION,
     MODEL_MAPPING,
     AVAILABLE_MODELS,
@@ -120,7 +119,6 @@ __all__ = [
     "router",
 
     # 配置
-    "PROXY_API_KEY",
     "REGION",
     "MODEL_MAPPING",
     "AVAILABLE_MODELS",
