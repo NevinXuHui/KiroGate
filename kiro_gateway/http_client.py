@@ -69,16 +69,16 @@ class GlobalHTTPClientManager:
 
                 # Fix proxy URL: convert socks5h:// to socks5://
                 # httpx doesn't support socks5h:// (SOCKS5 with remote DNS resolution)
-                proxies = None
+                proxy = None
                 for env_var in ['ALL_PROXY', 'all_proxy', 'HTTPS_PROXY', 'https_proxy', 'HTTP_PROXY', 'http_proxy']:
                     proxy_url = os.environ.get(env_var)
                     if proxy_url and 'socks5h://' in proxy_url:
-                        fixed_proxy = proxy_url.replace('socks5h://', 'socks5://')
-                        proxies = {
-                            'http://': fixed_proxy,
-                            'https://': fixed_proxy
-                        }
-                        logger.debug(f"Fixed proxy URL: {proxy_url} -> {fixed_proxy}")
+                        proxy = proxy_url.replace('socks5h://', 'socks5://')
+                        logger.debug(f"Fixed proxy URL: {proxy_url} -> {proxy}")
+                        break
+                    elif proxy_url:
+                        proxy = proxy_url
+                        logger.debug(f"Using proxy URL: {proxy}")
                         break
 
                 self._client = httpx.AsyncClient(
@@ -86,7 +86,7 @@ class GlobalHTTPClientManager:
                     follow_redirects=True,
                     limits=limits,
                     http2=False,
-                    proxies=proxies
+                    proxy=proxy
                 )
                 logger.debug("Created new global HTTP client with connection pool")
 

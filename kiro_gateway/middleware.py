@@ -216,22 +216,28 @@ class MetricsMiddleware(BaseHTTPMiddleware):
             metrics.dec_active_connections()
 
     def _track_token_usage(self, request: Request, success: bool) -> None:
-        """Track usage for sk-xxx API keys."""
+        """Track usage for sk-xxx API keys and super API keys."""
         try:
-            # Check if request used a user API key
+            # Check if request used a user API key or super API key
             if hasattr(request.state, "donated_token_id"):
                 from kiro_gateway.database import user_db
                 from kiro_gateway.token_allocator import token_allocator
 
                 token_id = request.state.donated_token_id
                 api_key_id = getattr(request.state, "api_key_id", None)
+                is_super_key = getattr(request.state, "is_super_key", False)
+                super_key_token = getattr(request.state, "super_key_token", None)
 
                 # Record token usage
                 token_allocator.record_usage(token_id, success)
 
-                # Record API key usage
+                # Record API key usage (regular user API key)
                 if api_key_id:
                     user_db.record_api_key_usage(api_key_id)
+                
+                # Record super API key usage
+                if is_super_key and super_key_token:
+                    user_db.record_super_key_usage(super_key_token)
 
         except Exception as e:
             logger.debug(f"[{get_timestamp()}] Token 使用追踪失败: {e}")

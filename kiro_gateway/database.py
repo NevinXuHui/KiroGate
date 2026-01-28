@@ -271,6 +271,16 @@ class UserDatabase:
                 );
                 CREATE INDEX IF NOT EXISTS idx_password_tokens_token ON password_reset_tokens(token);
                 CREATE INDEX IF NOT EXISTS idx_password_tokens_user ON password_reset_tokens(user_id);
+
+                -- Super API Keys usage statistics
+                CREATE TABLE IF NOT EXISTS super_api_key_usage (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    key_prefix TEXT NOT NULL,
+                    request_count INTEGER DEFAULT 0,
+                    last_used INTEGER,
+                    created_at INTEGER NOT NULL
+                );
+                CREATE UNIQUE INDEX IF NOT EXISTS idx_super_key_prefix ON super_api_key_usage(key_prefix);
             ''')
             # Add new columns to users table if not exists
             users_columns = {row[1] for row in conn.execute("PRAGMA table_info(users)")}
@@ -1572,6 +1582,42 @@ class UserDatabase:
                     "UPDATE import_keys SET request_count = request_count + 1, last_used = ? WHERE id = ?",
                     (now, key_id)
                 )
+
+    def record_super_key_usage(self, super_key: str) -> None:
+        """Record super API key usage."""
+        now = int(time.time() * 1000)
+        # Extract prefix for display (first 10 chars)
+        key_prefix = super_key[:15] if len(super_key) > 15 else super_key
+        
+        with self._lock:
+            with self._get_conn() as conn:
+                # Try to update existing record
+                cursor = conn.execute(
+                    "UPDATE super_api_key_usage SET request_count = request_count + 1, last_used = ? WHERE key_prefix = ?",
+                    (now, key_prefix)
+                )
+                # If no record exists, create one
+                if cursor.rowcount == 0:
+                    conn.execute(
+                        "INSERT INTO super_api_key_usage (key_prefix, request_count, last_used, created_at) VALUES (?, 1, ?, ?)",
+                        (key_prefix, now, now)
+                    )
+
+    def get_super_key_usage_stats(self) -> List[Dict[str, Any]]:
+        """Get usage statistics for all super API keys."""
+        with self._get_conn() as conn:
+            rows = conn.execute(
+                "SELECT key_prefix, request_count, last_used, created_at FROM super_api_key_usage ORDER BY request_count DESC"
+            ).fetchall()
+            return [
+                {
+                    "key_prefix": row["key_prefix"],
+                    "request_count": row["request_count"],
+                    "last_used": row["last_used"],
+                    "created_at": row["created_at"]
+                }
+                for row in rows
+            ]
 
     def get_api_key_count(self, user_id: Optional[int] = None) -> int:
         """Get API key count."""

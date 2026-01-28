@@ -826,21 +826,10 @@ COMMON_FOOTER = '''
   <footer style="background: var(--bg-card); border-top: 1px solid var(--border);" class="py-8 sm:py-10 mt-16 sm:mt-20">
     <div class="max-w-7xl mx-auto px-4">
       <div class="flex flex-col items-center">
-        <div class="flex items-center gap-2 mb-4">
+        <div class="flex items-center gap-2">
           <span class="text-2xl">⚡</span>
           <span class="text-xl font-bold gradient-text">徐辉牛逼</span>
         </div>
-        <p class="text-sm text-center mb-4" style="color: var(--text-muted);">OpenAI & Anthropic 兼容的 Kiro API 网关</p>
-        <div class="flex flex-wrap justify-center gap-x-6 gap-y-2 text-sm mb-6">
-          <span class="flex items-center gap-2">
-            <span class="w-2 h-2 rounded-full bg-blue-400"></span>
-            <span style="color: var(--text);">Python</span>
-            <a href="https://kirogate.fly.dev" class="text-indigo-400 hover:text-indigo-300 transition-colors" target="_blank">Online</a>
-            <span style="color: var(--border-dark);">·</span>
-            <a href="https://github.com/dext7r/KiroGate" class="text-indigo-400 hover:text-indigo-300 transition-colors" target="_blank">GitHub</a>
-          </span>
-        </div>
-        <p class="text-xs opacity-60" style="color: var(--text-muted);">欲买桂花同载酒 终不似少年游</p>
       </div>
     </div>
   </footer>
@@ -2849,8 +2838,14 @@ def render_admin_page() -> str:
 
         container.innerHTML = data.super_keys.map(item => `
           <div class="flex items-center justify-between p-3 rounded" style="background: var(--bg-card); border: 1px solid var(--border);">
-            <div class="flex-1 font-mono text-sm" style="color: var(--text);">
-              ${{item.key}}
+            <div class="flex-1">
+              <div class="font-mono text-sm mb-1" style="color: var(--text);">
+                ${{item.key}}
+              </div>
+              <div class="flex items-center gap-3 text-xs" style="color: var(--text-muted);">
+                <span title="请求次数">📊 ${{item.request_count || 0}} 次</span>
+                ${{item.last_used ? `<span title="最后使用时间">🕐 ${{new Date(item.last_used).toLocaleString('zh-CN')}}</span>` : '<span style="color: var(--text-muted);">未使用</span>'}}
+              </div>
             </div>
             <div class="flex items-center gap-2">
               <button onclick="copySuperKey('${{item.full_key}}')" class="text-xs px-2 py-1 rounded bg-blue-500/20 text-blue-400 hover:bg-blue-500/30" title="复制完整密钥">

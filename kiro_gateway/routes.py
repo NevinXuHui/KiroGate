@@ -1220,16 +1220,32 @@ async def admin_set_proxy_key(
 
 @router.get("/admin/api/super-keys", include_in_schema=False)
 async def admin_get_super_keys(request: Request):
-    """Get system-level super API keys."""
+    """Get system-level super API keys with usage statistics."""
     session = request.cookies.get("admin_session")
     if not verify_admin_session(session):
         return JSONResponse(status_code=401, content={"error": "未授权"})
 
     from kiro_gateway.config import settings
+    from kiro_gateway.database import user_db
+    
     super_keys = [k.strip() for k in settings.super_api_keys.split(',') if k.strip()]
 
-    # Mask keys for security (only show first 15 chars)
-    masked_keys = [{"key": k[:15] + "..." if len(k) > 15 else k, "full_key": k} for k in super_keys]
+    # Get usage statistics
+    usage_stats = user_db.get_super_key_usage_stats()
+    usage_dict = {stat["key_prefix"]: stat for stat in usage_stats}
+
+    # Mask keys for security and add usage stats
+    masked_keys = []
+    for k in super_keys:
+        key_prefix = k[:15] if len(k) > 15 else k
+        usage = usage_dict.get(key_prefix, {})
+        masked_keys.append({
+            "key": key_prefix + "..." if len(k) > 15 else k,
+            "full_key": k,
+            "request_count": usage.get("request_count", 0),
+            "last_used": usage.get("last_used"),
+            "created_at": usage.get("created_at")
+        })
 
     return {
         "super_keys": masked_keys,
