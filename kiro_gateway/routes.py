@@ -2498,7 +2498,14 @@ def get_current_user(request: Request):
     """Get current logged-in user from session."""
     from kiro_gateway.user_manager import user_manager
     session_token = request.cookies.get("user_session")
-    return user_manager.get_current_user(session_token) if session_token else None
+    user = user_manager.get_current_user(session_token) if session_token else None
+
+    # 设置用户信息到 request.state 供中间件日志使用
+    if user:
+        request.state.user_id = user.id
+        request.state.username = user.username
+
+    return user
 
 
 @router.get("/user", response_class=HTMLResponse, include_in_schema=False)
@@ -2517,6 +2524,7 @@ async def user_get_profile(request: Request):
     user = get_current_user(request)
     if not user:
         return JSONResponse(status_code=401, content={"error": "未登录"})
+
     from kiro_gateway.database import user_db
     from kiro_gateway.metrics import metrics
     token_counts = user_db.get_token_count(user.id)

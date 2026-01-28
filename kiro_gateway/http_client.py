@@ -62,9 +62,9 @@ class GlobalHTTPClientManager:
         async with self._lock:
             if self._client is None or self._client.is_closed:
                 limits = httpx.Limits(
-                    max_connections=100,
-                    max_keepalive_connections=20,
-                    keepalive_expiry=60.0  # Increased from 30.0 for long-running connections
+                    max_connections=200,
+                    max_keepalive_connections=50,
+                    keepalive_expiry=120.0
                 )
 
                 # Fix proxy URL: convert socks5h:// to socks5://
@@ -82,7 +82,7 @@ class GlobalHTTPClientManager:
                         break
 
                 self._client = httpx.AsyncClient(
-                    timeout=None,  # Timeout set per-request
+                    timeout=None,
                     follow_redirects=True,
                     limits=limits,
                     http2=False,

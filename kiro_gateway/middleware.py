@@ -43,8 +43,24 @@ def get_timestamp() -> str:
 def get_user_info(request: Request) -> str:
     """从请求中提取用户信息。"""
     try:
+        # 优先使用 username
         if hasattr(request.state, "username"):
             return request.state.username
+
+        # 如果有 user_id，从数据库获取用户名
+        if hasattr(request.state, "user_id"):
+            user_id = request.state.user_id
+            if user_id:
+                try:
+                    from kiro_gateway.database import user_db
+                    user = user_db.get_user(user_id)
+                    if user:
+                        return user.username
+                except Exception:
+                    pass
+                return f"用户 #{user_id}"
+
+        # 其他情况
         if hasattr(request.state, "api_key_id"):
             return f"API Key #{request.state.api_key_id}"
         if hasattr(request.state, "donated_token_id"):
@@ -108,42 +124,52 @@ class RequestTrackingMiddleware(BaseHTTPMiddleware):
         # Add request ID to request state
         request.state.request_id = request_id
 
+        # Skip detailed logging for static assets and health checks
+        path = request.url.path
+        is_static = path.startswith(("/static", "/favicon.ico"))
+        is_health = path in ("/health", "/ping", "/api/site-mode")
+        
         # Use loguru context to bind request ID
         with logger.contextualize(request_id=request_id):
-            client_ip = get_client_ip(request)
-            logger.info(
-                f"[{get_timestamp()}] [IP: {client_ip}] 请求开始: {request.method} {request.url.path}"
-                + (f" 参数: {request.url.query}" if request.url.query else "")
-            )
+            if not is_static and not is_health:
+                client_ip = get_client_ip(request)
+                logger.info(
+                    f"[{get_timestamp()}] [IP: {client_ip}] 请求开始: {request.method} {path}"
+                    + (f" 参数: {request.url.query}" if request.url.query else "")
+                )
 
             try:
                 response = await call_next(request)
 
                 # Calculate processing time
                 process_time = time.time() - start_time
-                user_info = get_user_info(request)
 
                 # Add response headers
                 response.headers["X-Request-ID"] = request_id
                 response.headers["X-Process-Time"] = str(round(process_time, 4))
 
-                status_text = "成功" if 200 <= response.status_code < 400 else "失败"
-                logger.info(
-                    f"[{get_timestamp()}] [用户: {user_info}] [IP: {client_ip}] "
-                    f"请求{status_text}: {request.method} {request.url.path} "
-                    f"状态码={response.status_code} 耗时={process_time:.4f}秒"
-                )
+                if not is_static and not is_health:
+                    user_info = get_user_info(request)
+                    client_ip = get_client_ip(request)
+                    status_text = "成功" if 200 <= response.status_code < 400 else "失败"
+                    logger.info(
+                        f"[{get_timestamp()}] [用户: {user_info}] [IP: {client_ip}] "
+                        f"请求{status_text}: {request.method} {path} "
+                        f"状态码={response.status_code} 耗时={process_time:.4f}秒"
+                    )
 
                 return response
 
             except Exception as e:
                 process_time = time.time() - start_time
-                user_info = get_user_info(request)
-                logger.error(
-                    f"[{get_timestamp()}] [用户: {user_info}] [IP: {client_ip}] "
-                    f"请求异常: {request.method} {request.url.path} "
-                    f"错误={str(e)} 耗时={process_time:.4f}秒"
-                )
+                if not is_static and not is_health:
+                    user_info = get_user_info(request)
+                    client_ip = get_client_ip(request)
+                    logger.error(
+                        f"[{get_timestamp()}] [用户: {user_info}] [IP: {client_ip}] "
+                        f"请求异常: {request.method} {path} "
+                        f"错误={str(e)} 耗时={process_time:.4f}秒"
+                    )
                 raise
 
 
@@ -174,9 +200,13 @@ class MetricsMiddleware(BaseHTTPMiddleware):
         start_time = time.time()
         endpoint = normalize_endpoint_path(request.url.path)
         model = "unknown"
+        
+        # Skip metrics for static assets
+        is_static = endpoint.startswith(("/static", "/favicon.ico"))
 
-        # Record client IP
-        metrics.record_ip(get_client_ip(request))
+        # Record client IP (skip for static)
+        if not is_static:
+            metrics.record_ip(get_client_ip(request))
 
         # Increment active connections
         metrics.inc_active_connections()
@@ -191,24 +221,26 @@ class MetricsMiddleware(BaseHTTPMiddleware):
             if hasattr(request.state, "model"):
                 model = request.state.model
 
-            # Record metrics
-            metrics.inc_request(endpoint, response.status_code, model)
-            metrics.observe_latency(endpoint, process_time)
+            # Record metrics (skip for static)
+            if not is_static:
+                metrics.inc_request(endpoint, response.status_code, model)
+                metrics.observe_latency(endpoint, process_time)
 
-            # Track API key and token usage for sk-xxx keys
-            is_success = 200 <= response.status_code < 400
-            self._track_token_usage(request, is_success)
+                # Track API key and token usage for sk-xxx keys
+                is_success = 200 <= response.status_code < 400
+                self._track_token_usage(request, is_success)
 
             return response
 
         except Exception as e:
             process_time = time.time() - start_time
-            metrics.inc_request(endpoint, 500, model)
-            metrics.inc_error(type(e).__name__)
-            metrics.observe_latency(endpoint, process_time)
+            if not is_static:
+                metrics.inc_request(endpoint, 500, model)
+                metrics.inc_error(type(e).__name__)
+                metrics.observe_latency(endpoint, process_time)
 
-            # Track failed request
-            self._track_token_usage(request, success=False)
+                # Track failed request
+                self._track_token_usage(request, success=False)
             raise
 
         finally:
