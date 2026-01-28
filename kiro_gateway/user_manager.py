@@ -359,6 +359,73 @@ class UserManager:
         """Logout user (session invalidation is handled by cookie deletion)."""
         return True
 
+    async def register_with_password(
+        self,
+        username: str,
+        email: str,
+        password: str
+    ) -> Tuple[Optional[User], Optional[str]]:
+        """
+        Register a new user with password.
+
+        Args:
+            username: Username (3-20 chars, alphanumeric + underscore)
+            email: Email address
+            password: Password (8-64 chars, must contain uppercase, lowercase, digit)
+
+        Returns:
+            (User, session_token) on success, (None, error_message) on failure
+        """
+        # 检查是否为自用模式
+        from kiro_gateway.metrics import metrics
+        if metrics.is_self_use_enabled():
+            return None, "自用模式下暂不开放注册"
+
+        # 调用数据库方法创建用户（包含所有验证逻辑）
+        success, message, user = user_db.create_user_with_password(username, email, password)
+
+        if not success:
+            return None, message
+
+        # 创建会话
+        session_token = self.session.create_session(user.id)
+        logger.info(f"New user registered with password: {username} (ID: {user.id})")
+
+        return user, session_token
+
+    async def login_with_password(
+        self,
+        identifier: str,
+        password: str
+    ) -> Tuple[Optional[User], Optional[str]]:
+        """
+        Login with username/email and password.
+
+        Args:
+            identifier: Username or email
+            password: Password
+
+        Returns:
+            (User, session_token) on success, (None, error_message) on failure
+        """
+        # 验证用户身份
+        user = user_db.authenticate_user(identifier, password)
+        if not user:
+            return None, "用户名/邮箱或密码错误"
+
+        # 检查用户状态
+        if user.is_banned:
+            return None, "用户已被封禁"
+
+        # 更新最后登录时间
+        user_db.update_last_login(user.id)
+
+        # 创建会话
+        session_token = self.session.create_session(user.id)
+        logger.info(f"User logged in with password: {user.username} (ID: {user.id})")
+
+        return user, session_token
+
 
 # Global user manager instance
 user_manager = UserManager()

@@ -44,6 +44,9 @@ class User:
     linuxdo_id: Optional[str]
     github_id: Optional[str]
     username: str
+    email: Optional[str]  # 新增：邮箱地址
+    password_hash: Optional[str]  # 新增：密码哈希
+    email_verified: bool  # 新增：邮箱是否已验证
     avatar_url: Optional[str]
     trust_level: int
     is_admin: bool
@@ -120,6 +123,9 @@ class UserDatabase:
                     linuxdo_id TEXT,
                     github_id TEXT,
                     username TEXT NOT NULL,
+                    email TEXT,
+                    password_hash TEXT,
+                    email_verified INTEGER DEFAULT 0,
                     avatar_url TEXT,
                     trust_level INTEGER DEFAULT 0,
                     is_admin INTEGER DEFAULT 0,
@@ -129,6 +135,7 @@ class UserDatabase:
                 );
                 CREATE INDEX IF NOT EXISTS idx_users_linuxdo ON users(linuxdo_id);
                 CREATE INDEX IF NOT EXISTS idx_users_github ON users(github_id);
+                CREATE UNIQUE INDEX IF NOT EXISTS idx_users_email ON users(email) WHERE email IS NOT NULL;
 
                 -- Donated tokens table
                 CREATE TABLE IF NOT EXISTS tokens (
@@ -239,7 +246,42 @@ class UserDatabase:
                 );
                 CREATE INDEX IF NOT EXISTS idx_announcement_status_user ON announcement_status(user_id);
                 CREATE INDEX IF NOT EXISTS idx_announcement_status_announcement ON announcement_status(announcement_id);
+
+                -- Email verification tokens
+                CREATE TABLE IF NOT EXISTS email_verification_tokens (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    user_id INTEGER NOT NULL,
+                    token TEXT UNIQUE NOT NULL,
+                    created_at INTEGER NOT NULL,
+                    expires_at INTEGER NOT NULL,
+                    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+                );
+                CREATE INDEX IF NOT EXISTS idx_email_tokens_token ON email_verification_tokens(token);
+                CREATE INDEX IF NOT EXISTS idx_email_tokens_user ON email_verification_tokens(user_id);
+
+                -- Password reset tokens
+                CREATE TABLE IF NOT EXISTS password_reset_tokens (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    user_id INTEGER NOT NULL,
+                    token TEXT UNIQUE NOT NULL,
+                    created_at INTEGER NOT NULL,
+                    expires_at INTEGER NOT NULL,
+                    used INTEGER DEFAULT 0,
+                    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+                );
+                CREATE INDEX IF NOT EXISTS idx_password_tokens_token ON password_reset_tokens(token);
+                CREATE INDEX IF NOT EXISTS idx_password_tokens_user ON password_reset_tokens(user_id);
             ''')
+            # Add new columns to users table if not exists
+            users_columns = {row[1] for row in conn.execute("PRAGMA table_info(users)")}
+            if "email" not in users_columns:
+                conn.execute("ALTER TABLE users ADD COLUMN email TEXT")
+            if "password_hash" not in users_columns:
+                conn.execute("ALTER TABLE users ADD COLUMN password_hash TEXT")
+            if "email_verified" not in users_columns:
+                conn.execute("ALTER TABLE users ADD COLUMN email_verified INTEGER DEFAULT 0")
+
+            # Add columns to tokens table if not exists
             columns = {row[1] for row in conn.execute("PRAGMA table_info(tokens)")}
             if "is_anonymous" not in columns:
                 conn.execute(
@@ -465,6 +507,122 @@ class UserDatabase:
             row = conn.execute("SELECT * FROM users WHERE github_id = ?", (github_id,)).fetchone()
             return self._row_to_user(row) if row else None
 
+    def get_user_by_email(self, email: str) -> Optional[User]:
+        """Get user by email address."""
+        with self._get_conn() as conn:
+            row = conn.execute("SELECT * FROM users WHERE email = ?", (email,)).fetchone()
+            return self._row_to_user(row) if row else None
+
+    def get_user_by_username_or_email(self, identifier: str) -> Optional[User]:
+        """Get user by username or email."""
+        with self._get_conn() as conn:
+            row = conn.execute(
+                "SELECT * FROM users WHERE username = ? OR email = ?",
+                (identifier, identifier)
+            ).fetchone()
+            return self._row_to_user(row) if row else None
+
+    def create_user_with_password(
+        self,
+        username: str,
+        email: str,
+        password: str
+    ) -> Tuple[bool, str, Optional[User]]:
+        """
+        Create a new user with password authentication.
+
+        Returns:
+            (success, message, user)
+        """
+        # 验证用户名格式
+        if not username or len(username) < 3 or len(username) > 20:
+            return False, "用户名长度必须在3-20个字符之间", None
+        if not username.replace('_', '').isalnum():
+            return False, "用户名只能包含字母、数字和下划线", None
+
+        # 验证邮箱格式
+        import re
+        email_pattern = r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$'
+        if not re.match(email_pattern, email):
+            return False, "邮箱格式不正确", None
+
+        # 验证密码强度
+        if len(password) < 8 or len(password) > 64:
+            return False, "密码长度必须在8-64个字符之间", None
+        if not any(c.isupper() for c in password):
+            return False, "密码必须包含至少一个大写字母", None
+        if not any(c.islower() for c in password):
+            return False, "密码必须包含至少一个小写字母", None
+        if not any(c.isdigit() for c in password):
+            return False, "密码必须包含至少一个数字", None
+
+        now = int(time.time() * 1000)
+        with self._lock:
+            with self._get_conn() as conn:
+                # 检查用户名是否已存在
+                existing = conn.execute("SELECT id FROM users WHERE username = ?", (username,)).fetchone()
+                if existing:
+                    return False, "用户名已被使用", None
+
+                # 检查邮箱是否已存在
+                existing = conn.execute("SELECT id FROM users WHERE email = ?", (email,)).fetchone()
+                if existing:
+                    return False, "邮箱已被注册", None
+
+                # 哈希密码
+                password_hash = self._hash_password(password)
+
+                # 创建用户
+                cursor = conn.execute(
+                    """INSERT INTO users (username, email, password_hash, email_verified, trust_level, created_at, last_login)
+                       VALUES (?, ?, ?, 0, 0, ?, ?)""",
+                    (username, email, password_hash, now, now)
+                )
+                user_id = cursor.lastrowid
+
+                user = User(
+                    id=user_id,
+                    linuxdo_id=None,
+                    github_id=None,
+                    username=username,
+                    email=email,
+                    password_hash=password_hash,
+                    email_verified=False,
+                    avatar_url=None,
+                    trust_level=0,
+                    is_admin=False,
+                    is_banned=False,
+                    created_at=now,
+                    last_login=now
+                )
+
+                return True, "注册成功", user
+
+    def authenticate_user(self, identifier: str, password: str) -> Optional[User]:
+        """
+        Authenticate user with username/email and password.
+
+        Args:
+            identifier: Username or email
+            password: Plain text password
+
+        Returns:
+            User object if authentication succeeds, None otherwise
+        """
+        # 查找用户
+        user = self.get_user_by_username_or_email(identifier)
+        if not user:
+            return None
+
+        # 验证密码
+        if not user.password_hash:
+            return None
+
+        if not self._verify_password(password, user.password_hash):
+            return None
+
+        return user
+
     def get_or_create_user_by_linuxdo(
         self,
         linuxdo_id: str,
@@ -665,6 +823,9 @@ class UserDatabase:
             linuxdo_id=row["linuxdo_id"],
             github_id=row["github_id"],
             username=row["username"],
+            email=row.get("email"),
+            password_hash=row.get("password_hash"),
+            email_verified=bool(row.get("email_verified", 0)),
             avatar_url=row["avatar_url"],
             trust_level=row["trust_level"],
             is_admin=bool(row["is_admin"]),
@@ -686,6 +847,19 @@ class UserDatabase:
     def _decrypt_token(self, encrypted: str) -> str:
         """Decrypt token from storage."""
         return self._fernet.decrypt(encrypted.encode()).decode()
+
+    def _hash_password(self, password: str) -> str:
+        """Hash password using bcrypt."""
+        import bcrypt
+        return bcrypt.hashpw(password.encode(), bcrypt.gensalt()).decode()
+
+    def _verify_password(self, password: str, password_hash: str) -> bool:
+        """Verify password against hash."""
+        import bcrypt
+        try:
+            return bcrypt.checkpw(password.encode(), password_hash.encode())
+        except Exception:
+            return False
 
     def donate_token(
         self,

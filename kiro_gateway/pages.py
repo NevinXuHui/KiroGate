@@ -6155,6 +6155,39 @@ def render_login_page() -> str:
           {login_buttons}
         </div>
 
+        <div class="my-6 flex items-center">
+          <div class="flex-1 h-px" style="background: var(--border);"></div>
+          <span class="px-4 text-sm" style="color: var(--text-muted);">或使用密码登录</span>
+          <div class="flex-1 h-px" style="background: var(--border);"></div>
+        </div>
+
+        <form id="password-login-form" class="space-y-4">
+          <div>
+            <input type="text" id="login-identifier" name="identifier" placeholder="用户名或邮箱" required
+              class="w-full px-4 py-3 rounded-lg transition-all"
+              style="background: var(--bg-input); border: 1px solid var(--border); color: var(--text);"
+              onfocus="this.style.borderColor='var(--primary)'"
+              onblur="this.style.borderColor='var(--border)'">
+          </div>
+          <div>
+            <input type="password" id="login-password" name="password" placeholder="密码" required
+              class="w-full px-4 py-3 rounded-lg transition-all"
+              style="background: var(--bg-input); border: 1px solid var(--border); color: var(--text);"
+              onfocus="this.style.borderColor='var(--primary)'"
+              onblur="this.style.borderColor='var(--border)'">
+          </div>
+          <button type="submit" class="w-full py-3 rounded-lg font-semibold transition-all"
+            style="background: linear-gradient(135deg, var(--primary) 0%, var(--primary-dark) 100%); color: white;">
+            登录
+          </button>
+          <div id="login-error" class="hidden p-3 rounded-lg text-sm" style="background: rgba(244, 63, 94, 0.12); border: 1px solid rgba(244, 63, 94, 0.35); color: #f43f5e;"></div>
+        </form>
+
+        <div class="mt-6 text-center text-sm">
+          <span style="color: var(--text-muted);">还没有账号？</span>
+          <a href="/auth/register-page" class="font-medium ml-1" style="color: var(--primary);">立即注册</a>
+        </div>
+
         <div class="my-8 flex items-center">
           <div class="flex-1 h-px" style="background: var(--border);"></div>
           <span class="px-4 text-sm" style="color: var(--text-muted);">登录后可以</span>
@@ -6176,6 +6209,54 @@ def render_login_page() -> str:
   </main>
 
   {COMMON_FOOTER}
+
+  <script>
+    // 处理密码登录表单提交
+    document.getElementById('password-login-form').addEventListener('submit', async (e) => {{
+      e.preventDefault();
+
+      const identifier = document.getElementById('login-identifier').value.trim();
+      const password = document.getElementById('login-password').value;
+      const errorDiv = document.getElementById('login-error');
+      const submitBtn = e.target.querySelector('button[type="submit"]');
+
+      // 隐藏错误信息
+      errorDiv.classList.add('hidden');
+
+      // 禁用提交按钮
+      submitBtn.disabled = true;
+      submitBtn.textContent = '登录中...';
+
+      try {{
+        const response = await fetch('/auth/login', {{
+          method: 'POST',
+          headers: {{
+            'Content-Type': 'application/json',
+          }},
+          body: JSON.stringify({{ identifier, password }}),
+        }});
+
+        const data = await response.json();
+
+        if (data.success) {{
+          // 登录成功，跳转到用户中心
+          window.location.href = '/user';
+        }} else {{
+          // 显示错误信息
+          errorDiv.textContent = data.message || '登录失败，请稍后重试';
+          errorDiv.classList.remove('hidden');
+          submitBtn.disabled = false;
+          submitBtn.textContent = '登录';
+        }}
+      }} catch (error) {{
+        console.error('Login error:', error);
+        errorDiv.textContent = '网络错误，请稍后重试';
+        errorDiv.classList.remove('hidden');
+        submitBtn.disabled = false;
+        submitBtn.textContent = '登录';
+      }}
+    }});
+  </script>
 </body>
 </html>'''
 
@@ -6220,5 +6301,235 @@ def render_404_page() -> str:
     </div>
   </main>
   {COMMON_FOOTER}
+</body>
+</html>'''
+
+
+def render_register_page() -> str:
+    """Render the user registration page."""
+    from kiro_gateway.metrics import metrics
+    
+    self_use_enabled = metrics.is_self_use_enabled()
+    body_self_use_attr = "true" if self_use_enabled else "false"
+    
+    return f'''<!DOCTYPE html>
+<html lang="zh">
+<head>{COMMON_HEAD}
+  <style>
+    .register-card {{
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: 1.5rem;
+      box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.15);
+    }}
+    .form-input {{
+      width: 100%;
+      padding: 12px 16px;
+      border-radius: 10px;
+      transition: all 0.3s ease;
+      background: var(--bg-input);
+      border: 1px solid var(--border);
+      color: var(--text);
+    }}
+    .form-input:focus {{
+      outline: none;
+      border-color: var(--primary);
+      box-shadow: 0 0 0 3px rgba(56, 189, 248, 0.1);
+    }}
+    .btn-register {{
+      width: 100%;
+      padding: 14px 24px;
+      border-radius: 12px;
+      font-weight: 600;
+      font-size: 1rem;
+      transition: all 0.3s ease;
+      background: linear-gradient(135deg, var(--primary) 0%, var(--primary-dark) 100%);
+      color: white;
+      border: none;
+      cursor: pointer;
+    }}
+    .btn-register:hover {{
+      transform: translateY(-2px);
+      box-shadow: 0 10px 25px -5px rgba(56, 189, 248, 0.4);
+    }}
+    .btn-register:disabled {{
+      opacity: 0.6;
+      cursor: not-allowed;
+      transform: none;
+    }}
+    .password-strength {{
+      height: 4px;
+      border-radius: 2px;
+      background: var(--border);
+      overflow: hidden;
+      margin-top: 8px;
+    }}
+    .password-strength-bar {{
+      height: 100%;
+      transition: all 0.3s ease;
+      background: linear-gradient(90deg, #f43f5e 0%, #f59e0b 50%, #22c55e 100%);
+    }}
+  </style>
+</head>
+<body data-self-use="{body_self_use_attr}">
+  {COMMON_NAV}
+
+  <main class="flex-1 flex items-center justify-center py-12 px-4" style="min-height: calc(100vh - 200px);">
+    <div class="w-full max-w-md">
+      <div class="register-card p-8">
+        <div class="text-center mb-8">
+          <div class="inline-block text-6xl mb-4">🚀</div>
+          <h1 class="text-2xl font-bold mb-2">创建账号</h1>
+          <p style="color: var(--text-muted);">加入 KiroGate，开始使用 Claude API</p>
+        </div>
+
+        <div class="self-use-only mb-6 px-4 py-3 rounded-lg text-sm" style="background: rgba(245, 158, 11, 0.12); border: 1px solid rgba(245, 158, 11, 0.35); color: #d97706;">
+          自用模式已开启：暂不开放注册。
+        </div>
+
+        <form id="register-form" class="space-y-4">
+          <div>
+            <label class="block text-sm font-medium mb-2" style="color: var(--text);">用户名</label>
+            <input type="text" id="register-username" name="username" placeholder="3-20个字符，字母数字下划线" required
+              class="form-input" minlength="3" maxlength="20" pattern="[a-zA-Z0-9_]+">
+            <p class="text-xs mt-1" style="color: var(--text-muted);">只能包含字母、数字和下划线</p>
+          </div>
+
+          <div>
+            <label class="block text-sm font-medium mb-2" style="color: var(--text);">邮箱</label>
+            <input type="email" id="register-email" name="email" placeholder="your@email.com" required
+              class="form-input">
+          </div>
+
+          <div>
+            <label class="block text-sm font-medium mb-2" style="color: var(--text);">密码</label>
+            <input type="password" id="register-password" name="password" placeholder="至少8位，包含大小写字母和数字" required
+              class="form-input" minlength="8" maxlength="64">
+            <div class="password-strength">
+              <div id="password-strength-bar" class="password-strength-bar" style="width: 0%"></div>
+            </div>
+            <p id="password-hint" class="text-xs mt-1" style="color: var(--text-muted);">密码强度：弱</p>
+          </div>
+
+          <div>
+            <label class="block text-sm font-medium mb-2" style="color: var(--text);">确认密码</label>
+            <input type="password" id="register-password-confirm" name="password_confirm" placeholder="再次输入密码" required
+              class="form-input" minlength="8" maxlength="64">
+          </div>
+
+          <div id="register-error" class="hidden p-3 rounded-lg text-sm" style="background: rgba(244, 63, 94, 0.12); border: 1px solid rgba(244, 63, 94, 0.35); color: #f43f5e;"></div>
+
+          <button type="submit" class="btn-register">
+            注册
+          </button>
+        </form>
+
+        <div class="mt-6 text-center text-sm">
+          <span style="color: var(--text-muted);">已有账号？</span>
+          <a href="/login" class="font-medium ml-1" style="color: var(--primary);">立即登录</a>
+        </div>
+
+        <div class="mt-8 p-4 rounded-lg text-xs" style="background: var(--bg-main); color: var(--text-muted);">
+          <p class="mb-2">📋 密码要求：</p>
+          <ul class="space-y-1 ml-4">
+            <li>• 长度 8-64 个字符</li>
+            <li>• 至少包含一个大写字母</li>
+            <li>• 至少包含一个小写字母</li>
+            <li>• 至少包含一个数字</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+  </main>
+
+  {COMMON_FOOTER}
+
+  <script>
+    // 密码强度检测
+    const passwordInput = document.getElementById('register-password');
+    const strengthBar = document.getElementById('password-strength-bar');
+    const strengthHint = document.getElementById('password-hint');
+
+    passwordInput.addEventListener('input', () => {{
+      const password = passwordInput.value;
+      let strength = 0;
+
+      if (password.length >= 8) strength += 25;
+      if (password.length >= 12) strength += 25;
+      if (/[a-z]/.test(password) && /[A-Z]/.test(password)) strength += 25;
+      if (/[0-9]/.test(password)) strength += 25;
+
+      strengthBar.style.width = strength + '%';
+
+      if (strength <= 25) {{
+        strengthHint.textContent = '密码强度：弱';
+        strengthHint.style.color = '#f43f5e';
+      }} else if (strength <= 50) {{
+        strengthHint.textContent = '密码强度：中';
+        strengthHint.style.color = '#f59e0b';
+      }} else if (strength <= 75) {{
+        strengthHint.textContent = '密码强度：良好';
+        strengthHint.style.color = '#22c55e';
+      }} else {{
+        strengthHint.textContent = '密码强度：强';
+        strengthHint.style.color = '#22c55e';
+      }}
+    }});
+
+    // 处理注册表单提交
+    document.getElementById('register-form').addEventListener('submit', async (e) => {{
+      e.preventDefault();
+
+      const username = document.getElementById('register-username').value.trim();
+      const email = document.getElementById('register-email').value.trim();
+      const password = document.getElementById('register-password').value;
+      const passwordConfirm = document.getElementById('register-password-confirm').value;
+      const errorDiv = document.getElementById('register-error');
+      const submitBtn = e.target.querySelector('button[type="submit"]');
+
+      // 隐藏错误信息
+      errorDiv.classList.add('hidden');
+
+      // 验证密码匹配
+      if (password !== passwordConfirm) {{
+        errorDiv.textContent = '两次输入的密码不一致';
+        errorDiv.classList.remove('hidden');
+        return;
+      }}
+
+      // 禁用提交按钮
+      submitBtn.disabled = true;
+      submitBtn.textContent = '注册中...';
+
+      try {{
+        const response = await fetch('/auth/register', {{
+          method: 'POST',
+          headers: {{
+            'Content-Type': 'application/json',
+          }},
+          body: JSON.stringify({{ username, email, password }}),
+        }});
+
+        const data = await response.json();
+
+        if (data.success) {{
+          // 注册成功，跳转到用户中心
+          window.location.href = '/user';
+        }} else {{
+          // 显示错误信息
+          errorDiv.textContent = data.message || '注册失败，请稍后重试';
+          errorDiv.classList.remove('hidden');
+          submitBtn.disabled = false;
+          submitBtn.textContent = '注册';
+        }}
+      }} catch (error) {{
+        console.error('Registration error:', error);
+        errorDiv.textContent = '网络错误，请稍后重试';
+        errorDiv.classList.remove('hidden');
+        submitBtn.disabled = false;
+        submitBtn.textContent = '注册';
+      }}
+    }});
+  </script>
 </body>
 </html>'''

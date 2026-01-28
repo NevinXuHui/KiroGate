@@ -2155,6 +2155,121 @@ async def oauth2_logout():
     return response
 
 
+# ==================== Password Authentication Routes ====================
+
+@router.post("/auth/register", include_in_schema=False)
+async def auth_register(request: Request):
+    """User registration with password."""
+    from kiro_gateway.user_manager import user_manager
+
+    try:
+        # 解析请求体
+        body = await request.json()
+        username = body.get("username", "").strip()
+        email = body.get("email", "").strip()
+        password = body.get("password", "")
+
+        if not username or not email or not password:
+            return JSONResponse(
+                content={"success": False, "message": "用户名、邮箱和密码不能为空"},
+                status_code=400
+            )
+
+        # 调用用户管理器注册
+        user, result = await user_manager.register_with_password(username, email, password)
+
+        if not user:
+            return JSONResponse(
+                content={"success": False, "message": result},
+                status_code=400
+            )
+
+        # 创建会话并设置 Cookie
+        response = JSONResponse(
+            content={
+                "success": True,
+                "message": "注册成功",
+                "user": {
+                    "id": user.id,
+                    "username": user.username,
+                    "email": user.email
+                }
+            }
+        )
+        response.set_cookie(
+            key="user_session",
+            value=result,  # session_token
+            httponly=True,
+            max_age=settings.user_session_max_age,
+            samesite=settings.user_cookie_samesite,
+            secure=_cookie_secure(request)
+        )
+        return response
+
+    except Exception as e:
+        logger.error(f"Registration error: {e}")
+        return JSONResponse(
+            content={"success": False, "message": "注册失败，请稍后重试"},
+            status_code=500
+        )
+
+
+@router.post("/auth/login", include_in_schema=False)
+async def auth_login(request: Request):
+    """User login with password."""
+    from kiro_gateway.user_manager import user_manager
+
+    try:
+        # 解析请求体
+        body = await request.json()
+        identifier = body.get("identifier", "").strip()
+        password = body.get("password", "")
+
+        if not identifier or not password:
+            return JSONResponse(
+                content={"success": False, "message": "用户名/邮箱和密码不能为空"},
+                status_code=400
+            )
+
+        # 调用用户管理器登录
+        user, result = await user_manager.login_with_password(identifier, password)
+
+        if not user:
+            return JSONResponse(
+                content={"success": False, "message": result},
+                status_code=400
+            )
+
+        # 创建会话并设置 Cookie
+        response = JSONResponse(
+            content={
+                "success": True,
+                "message": "登录成功",
+                "user": {
+                    "id": user.id,
+                    "username": user.username,
+                    "email": user.email
+                }
+            }
+        )
+        response.set_cookie(
+            key="user_session",
+            value=result,  # session_token
+            httponly=True,
+            max_age=settings.user_session_max_age,
+            samesite=settings.user_cookie_samesite,
+            secure=_cookie_secure(request)
+        )
+        return response
+
+    except Exception as e:
+        logger.error(f"Login error: {e}")
+        return JSONResponse(
+            content={"success": False, "message": "登录失败，请稍后重试"},
+            status_code=500
+        )
+
+
 # ==================== GitHub OAuth2 Routes ====================
 
 @router.get("/login", response_class=HTMLResponse, include_in_schema=False)
@@ -2166,6 +2281,17 @@ async def login_page(request: Request):
         return RedirectResponse(url=redirect_url, status_code=303)
     from kiro_gateway.pages import render_login_page
     return HTMLResponse(content=render_login_page())
+
+
+@router.get("/auth/register-page", response_class=HTMLResponse, include_in_schema=False)
+async def register_page(request: Request):
+    """User registration page."""
+    user = get_current_user(request)
+    if user:
+        redirect_url = f"{_request_origin(request)}/user"
+        return RedirectResponse(url=redirect_url, status_code=303)
+    from kiro_gateway.pages import render_register_page
+    return HTMLResponse(content=render_register_page())
 
 
 @router.get("/oauth2/github/login", include_in_schema=False)
